@@ -68,4 +68,24 @@ void Eth::eth_init()
     
     SYSCFG->PMC|=SYSCFG_PMC_MII_RMII_SEL; //RMII PHY interface is selected
 
+    /*!<Write to the ETH_DMAIER register to mask unnecessary interrupt causes.>*/
+    //ETH->DMAIER|=
+
+    /*!<Write to the MAC ETH_MACCR register to configure and enable the transmit and receive operating modes.>*/
+    //ETH->MACCR|=
+    /*!<Write to the ETH_DMAOMR register to set bits 13 and 1 and start transmission and reception.>*/
+    //ETH->DMAOMR|=
+
+    /*!< ethernet mac configuration register>*/
+    ETH->MACCR|=ETH_MACCR_FES; //1 - 1: 100 Mbit/s   (0: 10 Mbit/s)
+    ETH->MACCR|=ETH_MACCR_DM; // 1 - full duplex mode
+    ETH->MACCR&=~ETH_MACCR_IPCO; // 0 - IPv4 checksums disabled
+    ETH->MACCR&=~ETH_MACCR_TE; // transmit enable 
+    ETH->MACCR&=~ETH_MACCR_RE; // receive enable 
+    /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
+    ETH->MACMIIAR|=ETH_MACMIIAR_CR_Div26; //011 35-60 MHz HCLK/26
+    ETH->MACMIIAR|=ETH_MACMIIAR_MW; //0-write 1-read  operation using the MII Data register
+    /*!<Ethernet MAC address >*/
+    ETH->MACA0HR=0x1234; //16 bits (47:32) of the 6-byte MAC address0
+    ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 
 }
