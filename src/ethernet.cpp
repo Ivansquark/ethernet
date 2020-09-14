@@ -68,6 +68,11 @@ void Eth::eth_init()
     
     SYSCFG->PMC|=SYSCFG_PMC_MII_RMII_SEL; //RMII PHY interface is selected
 
+    RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACTXEN; // Ethernet Transmission clock enable
+    RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACRXEN; //Ethernet Reception clock enable
+    //RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACPTPEN; // Ethernet PTP clock enable
+    RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACEN; // MAC enabled
+
     /*!<Write to the ETH_DMAIER register to mask unnecessary interrupt causes.>*/
     //ETH->DMAIER|=
 
