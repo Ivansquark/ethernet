@@ -23,6 +23,7 @@
 
 //#include "irq.h"
 #include "led.h"
+#include "ethernet.hpp"
 //#include "sdspi.hpp"
 //#include "i2c.h"
 //#include "r2r.h"

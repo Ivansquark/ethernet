@@ -38,8 +38,8 @@ main.bin: main.elf
 main.lst: main.elf
 	arm-none-eabi-objdump -D main.elf > main.lst
 
-main.elf: startup.o malloc.o main.o
-	$(CC) -o main.elf -T$(LIB)stm32f4.ld startup.o malloc.o main.o \
+main.elf: startup.o malloc.o ethernet.o main.o
+	$(CC) -o main.elf -T$(LIB)stm32f4.ld startup.o malloc.o ethernet.o main.o \
 	$(LFLAGS) -Xlinker -Map=main.map 
 	# -z  muldefs
 	arm-none-eabi-size main.elf
@@ -49,6 +49,8 @@ startup.o: $(LIB)startup.cpp
 	#arm-none-eabi-objdump startup.o -h
 malloc.o: $(SRC)malloc.cpp $(INC) 
 	$(CC) $(SRC)malloc.cpp -o malloc.o -I$(INC) $(CPPFLAGS)
+ethernet.o: src/ethernet.cpp
+	$(CC) src/ethernet.cpp -o ethernet.o -I$(INC) -I$(LIB) $(CPPFLAGS)
 
 main.o: $(TARGET) $(INC) 
 	$(CC) $(TARGET) -o main.o -I$(INC) -I$(LIB) $(CPPFLAGS)

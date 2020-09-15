@@ -73,27 +73,28 @@ void Eth::eth_init()
     RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACRXEN; //Ethernet Reception clock enable
     //RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACPTPEN; // Ethernet PTP clock enable
     RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACEN; // MAC enabled
+    
 	/*!<The bus mode register establishes the bus operating modes for the DMA.>*/
 	/* Set the SWR bit: resets all MAC subsystem internal registers and logic */
 	ETH->DMABMR|=ETH_DMABMR_SR;//Software reset
 	/* Wait for software reset */
-	while (((heth->Instance)->DMABMR & ETH_DMABMR_SR) != (uint32_t)RESET)
-	{
-		/* Check for the Timeout */
-		if((HAL_GetTick() - tickstart ) > ETH_TIMEOUT_SWRESET)
-		{     
-		heth->State= HAL_ETH_STATE_TIMEOUT;	
-		/* Process Unlocked */
-		__HAL_UNLOCK(heth);		
-		/* Note: The SWR is not performed if the ETH_RX_CLK or the ETH_TX_CLK are  
-			not available, please check your external PHY or the IO configuration */
-		return HAL_TIMEOUT;
-		}
-	}
+	//while (((heth->Instance)->DMABMR & ETH_DMABMR_SR) != (uint32_t)RESET)
+	//{
+	//	/* Check for the Timeout */
+	//	if((HAL_GetTick() - tickstart ) > ETH_TIMEOUT_SWRESET)
+	//	{     
+	//	heth->State= HAL_ETH_STATE_TIMEOUT;	
+	//	/* Process Unlocked */
+	//	__HAL_UNLOCK(heth);		
+	//	/* Note: The SWR is not performed if the ETH_RX_CLK or the ETH_TX_CLK are  
+	//		not available, please check your external PHY or the IO configuration */
+	//	return HAL_TIMEOUT;
+	//	}
+	//}
 	
 	/*-------------------------------- MAC Initialization ----------------------*/
-	uint32_t temp =0U;
-	temp = ETH_MACMIIAR;
+	//uint32_t temp =0U;    
+	//temp = ETH->MACMIIAR;
     /*!<Write to the ETH_DMAIER register to mask unnecessary interrupt causes.>*/
     //ETH->DMAIER|=
 
@@ -101,22 +102,47 @@ void Eth::eth_init()
     //ETH->MACCR|=
     /*!<Write to the ETH_DMAOMR register to set bits 13 and 1 and start transmission and reception.>*/
     //ETH->DMAOMR|=
-
+    /*-------------------- PHY initialization and configuration ----------------*/
+    /*!<SMI configuration>*/
+    ETH->MACMIIAR|=(1<<11);//PHY address = 1 !!!!
+    ETH->MACMIIAR|=ETH_MACMIIAR_CR_Div102; /* CSR Clock Range between 150-183 MHz */ 
     /*!< ethernet mac configuration register>*/
-    ETH->MACCR|=ETH_MACCR_FES; //1 - 1: 100 Mbit/s   (0: 10 Mbit/s)
+    uint8_t smiReg0 = smi_read(0);
+    if(smiReg0>>5) //if 100 Mb/s   /*!<suppose that always full duplex>*/
+    {
+        ETH->MACCR|=ETH_MACCR_FES; //1 - 1: 100 Mbit/s
+    }else {ETH->MACCR&=~ETH_MACCR_FES;} /* 0 - (0: 10 Mbit/s)*/
+    
     ETH->MACCR|=ETH_MACCR_DM; // 1 - full duplex mode
     ETH->MACCR&=~ETH_MACCR_IPCO; // 0 - IPv4 checksums disabled
     ETH->MACCR&=~ETH_MACCR_TE; // transmit enable 
     ETH->MACCR&=~ETH_MACCR_RE; // receive enable 
     /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
-    ETH->MACMIIAR|=ETH_MACMIIAR_CR_Div102; /* CSR Clock Range between 150-183 MHz */ 
-    ETH->MACMIIAR|=ETH_MACMIIAR_MW; //0-write 1-read  operation using the MII Data register
     /*!<Ethernet MAC address >*/
     ETH->MACA0HR=0x1234; //16 bits (47:32) of the 6-byte MAC address0
-    ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 
-	
+    ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 	
 	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
-	
-	 /*-------------------- PHY initialization and configuration ----------------*/
-	 
+}
+
+
+uint8_t Eth::smi_read(uint8_t reg_num)
+{
+    uint16_t x=0;
+    ETH->MACMIIAR&=~ETH_MACMIIAR_MW;//read ready    
+    ETH->MACMIIAR|=(reg_num&0x1F)<<6; //write number of PHY register in reg
+    ETH->MACMIIAR|=ETH_MACMIIAR_MB;//to start
+    for(uint8_t i=0;i<2;i++)
+    {
+        x=ETH->MACMIIDR;
+        while(ETH->MACMIIAR & ETH_MACMIIAR_MB);        
+    }
+    return x>>8;
+}
+void Eth::smi_write(uint8_t reg_num, uint8_t val)
+{
+    ETH->MACMIIAR|=ETH_MACMIIAR_MW;//write ready
+    ETH->MACMIIAR|=(reg_num&0x1F)<<6; //write number of PHY register in reg 
+    ETH->MACMIIAR|=ETH_MACMIIAR_MB;//to start
+    ETH->MACMIIDR=val<<8;
+    while(ETH->MACMIIAR & ETH_MACMIIAR_MB);    
 }
