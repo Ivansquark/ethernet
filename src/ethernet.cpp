@@ -66,13 +66,34 @@ void Eth::eth_init()
     GPIOC->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR5; //1:1 max speed
     GPIOC->AFR[0] |= (11<<20); //ethernet
     
-    SYSCFG->PMC|=SYSCFG_PMC_MII_RMII_SEL; //RMII PHY interface is selected
+    RCC->APB2ENR|=RCC_APB2ENR_SYSCFGEN; /* Enable SYSCFG Clock */
+	SYSCFG->PMC|=SYSCFG_PMC_MII_RMII_SEL; //RMII PHY interface is selected	
 
     RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACTXEN; // Ethernet Transmission clock enable
     RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACRXEN; //Ethernet Reception clock enable
     //RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACPTPEN; // Ethernet PTP clock enable
     RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACEN; // MAC enabled
-
+	/*!<The bus mode register establishes the bus operating modes for the DMA.>*/
+	/* Set the SWR bit: resets all MAC subsystem internal registers and logic */
+	ETH->DMABMR|=ETH_DMABMR_SR;//Software reset
+	/* Wait for software reset */
+	while (((heth->Instance)->DMABMR & ETH_DMABMR_SR) != (uint32_t)RESET)
+	{
+		/* Check for the Timeout */
+		if((HAL_GetTick() - tickstart ) > ETH_TIMEOUT_SWRESET)
+		{     
+		heth->State= HAL_ETH_STATE_TIMEOUT;	
+		/* Process Unlocked */
+		__HAL_UNLOCK(heth);		
+		/* Note: The SWR is not performed if the ETH_RX_CLK or the ETH_TX_CLK are  
+			not available, please check your external PHY or the IO configuration */
+		return HAL_TIMEOUT;
+		}
+	}
+	
+	/*-------------------------------- MAC Initialization ----------------------*/
+	uint32_t temp =0U;
+	temp = ETH_MACMIIAR;
     /*!<Write to the ETH_DMAIER register to mask unnecessary interrupt causes.>*/
     //ETH->DMAIER|=
 
@@ -88,9 +109,14 @@ void Eth::eth_init()
     ETH->MACCR&=~ETH_MACCR_TE; // transmit enable 
     ETH->MACCR&=~ETH_MACCR_RE; // receive enable 
     /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
-    ETH->MACMIIAR|=ETH_MACMIIAR_CR_Div26; //011 35-60 MHz HCLK/26
+    ETH->MACMIIAR|=ETH_MACMIIAR_CR_Div102; /* CSR Clock Range between 150-183 MHz */ 
     ETH->MACMIIAR|=ETH_MACMIIAR_MW; //0-write 1-read  operation using the MII Data register
     /*!<Ethernet MAC address >*/
     ETH->MACA0HR=0x1234; //16 bits (47:32) of the 6-byte MAC address0
     ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 
+	
+	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
+	
+	 /*-------------------- PHY initialization and configuration ----------------*/
+	 
 }
