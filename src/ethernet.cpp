@@ -94,21 +94,12 @@ void Eth::eth_init()
 	//	return HAL_TIMEOUT;
 	//	}
 	//}
-	
-	/*-------------------------------- MAC Initialization ----------------------*/
-	//uint32_t temp =0U;    
-	//temp = ETH->MACMIIAR;
-    /*!<Write to the ETH_DMAIER register to mask unnecessary interrupt causes.>*/
-    //ETH->DMAIER|=
-
-    /*!<Write to the MAC ETH_MACCR register to configure and enable the transmit and receive operating modes.>*/
-    //ETH->MACCR|=
-    /*!<Write to the ETH_DMAOMR register to set bits 13 and 1 and start transmission and reception.>*/
-    //ETH->DMAOMR|=
+		
     /*-------------------- PHY initialization and configuration ----------------*/
     /*!<SMI configuration>*/
     ETH->MACMIIAR|=(1<<11);//PHY address = 1 !!!!
     ETH->MACMIIAR|=ETH_MACMIIAR_CR_Div102; /* CSR Clock Range between 150-183 MHz */ 
+    /*-------------------------------- MAC Initialization ----------------------*/
     /*!< ethernet mac configuration register>*/
     uint8_t smiReg0 = smi_read(0);
     if(smiReg0>>5) //if 100 Mb/s   /*!<suppose that always full duplex>*/
@@ -122,16 +113,18 @@ void Eth::eth_init()
     
     /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
     /*!<Ethernet MAC address >*/
-    ETH->MACA0HR=0x1234; //16 bits (47:32) of the 6-byte MAC address0
+    ETH->MACA0HR=0x3412; //16 bits (47:32) of the 6-byte MAC address0
     ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 	
 	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
 	/*!<Descriptor lists initialization>*/
 	/*!<The Receive descriptor list address register points to the start of the receive descriptor list.>*/
-	ETH->DMARDLAR = Eth::ReceiveDL; //write start address of recieve descriptor list array in special reg
+	ETH->DMARDLAR = (uint32_t)ReceiveDL; //write start address of recieve descriptor list array in special reg
 	/*!<Transmit descriptor list address register points to the start of the transmit descriptor list.>*/
-	ETH->DMATDLAR = Eth::TransmitDL; //write start address of recieve descriptor list array in special reg
-	/*!<for hardware counting of checksums transmit FIFO must configured for Store-and-forward mode (not in treashold control mode)>*/
-	ETH->DMAOMR |= ETH_DMAOMR_TSF;//transmission starts when a full frame resides in the Transmit FIFO. TTC - ignored
+	ETH->DMATDLAR = (uint32_t)TransmitDL; //write start address of recieve descriptor list array in special reg
+	
+    /*!<for hardware counting of checksums transmit FIFO must configured for Store-and-forward mode (not in treashold control mode)>*/
+	/*!< operation mode register >*/
+    ETH->DMAOMR |= ETH_DMAOMR_TSF;//transmission starts when a full frame resides in the Transmit FIFO. TTC - ignored
 	ETH->DMAOMR |= ETH_DMAOMR_RSF;//frame is read from the Rx FIFO after the complete frame has been written to it; RTC - ignored  
 	
 	/*!<Descriptors lists configuration>*/
@@ -140,13 +133,13 @@ void Eth::eth_init()
 	/*<interrupts>*/
 	ETH->DMAIER|= ETH_DMAIER_NISE; //Normal interrupt enable
 	//ETH->DMAIER|= ETH_DMAIER_RIE; //Receive interrupt enable
-	//ETH->DMAIER|= ETH_DMAIER_TIE; //Receive interrupt enable
+	//ETH->DMAIER|= ETH_DMAIER_TIE; //Transmit interrupt enable
 	
 	ETH->MACCR|=ETH_MACCR_TE; // transmit enable 
     ETH->MACCR|=ETH_MACCR_RE; // receive enable 
-	/*!< operation mode register >*/
 	
-	ETH->DMABMR&=!ETH_DMABMR_PBL_1// 1: 1-byte
+	ETH->DMABMR&=~ETH_DMABMR_PBL;
+	ETH->DMABMR|=ETH_DMABMR_PBL_1Beat;// 1: 1-byte
 }
 
 
@@ -172,12 +165,12 @@ void Eth::smi_write(uint8_t reg_num, uint8_t val)
     while(ETH->MACMIIAR & ETH_MACMIIAR_MB);    
 }
 //--------------------------------------------------------------------------------------------------------
-void Eth::descr_init(uint32_t TxAddr, uint32_t RxAddr)
+void Eth::descr_init(uint8_t* TxAddr, uint8_t* RxAddr)
 {
-	ReceiveDL[3]=RecievDL; //sets address of new descriptor (its the same)
-	TransmitDL[3]=TransmitDL; //sets address of new descriptor (its the same)
-	ReceiveDL[2]=RxAddr; //sets address of new descriptor (its the same)
-	TransmitDL[2]=TxAddr; //sets address of new descriptor (its the same)
+	ReceiveDL[3] = (uint32_t)ReceiveDL; //sets address of new descriptor (its the same)
+	TransmitDL[3] = (uint32_t)TransmitDL; //sets address of new descriptor (its the same)
+	ReceiveDL[2] = (uint32_t)RxAddr; //sets address of new descriptor (its the same)
+	TransmitDL[2] = (uint32_t)TxAddr; //sets address of new descriptor (its the same)
 	/*!< Two descriptors indicates on data two buffers >*/
 	ReceiveDL[0] = 0;
 	ReceiveDL[1] = 0;
@@ -196,14 +189,18 @@ void Eth::receive_frame()
 	ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
 	ETH->DMAOMR |= ETH_DMAOMR_SR; //start reception (starts DMA polling)
 	//need timer		
+    for(uint32_t i=0;i<50000000;i++);
 	ETH->DMAOMR &=~ ETH_DMAOMR_SR; //(ends DMA polling)
 }
 
-void Eth::transmit_frame()
+void Eth::transmit_frame(uint16_t size)
 {
 	TransmitDL[0] |= (1<<31); //sets OWN bit to DMA
+    TransmitDL[1] = 0;
+    TransmitDL[1] |= (size); //size of Tx first buffer
 	ETH->DMAOMR |= ETH_DMAOMR_ST; //start transmittion (starts DMA polling)
 	//need timer
+    for(uint32_t i=0;i<50000000;i++);
 	ETH->DMAOMR &=~ ETH_DMAOMR_ST; //(ends DMA polling)
 }
 

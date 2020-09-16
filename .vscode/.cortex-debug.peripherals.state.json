@@ -1,1 +1,1 @@
-[{"node":"GPIOA.AFRH","expanded":true,"format":0},{"node":"GPIOB","expanded":true,"format":0},{"node":"GPIOB.ODR","expanded":true,"format":0}]
+[{"node":"Ethernet_DMA","expanded":true,"format":0},{"node":"Ethernet_DMA.DMAOMR","expanded":true,"format":0},{"node":"GPIOA.AFRH","expanded":true,"format":0},{"node":"GPIOB","expanded":true,"format":0},{"node":"GPIOB.ODR","expanded":true,"format":0}]
