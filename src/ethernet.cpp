@@ -1,5 +1,8 @@
 #include "ethernet.hpp"
 
+uint32_t Eth::ReceiveDL[4]={0};
+uint32_t Eth::TransmitDL[4]={0};
+
 Eth::Eth()
 {
     eth_init();
@@ -114,14 +117,36 @@ void Eth::eth_init()
     }else {ETH->MACCR&=~ETH_MACCR_FES;} /* 0 - (0: 10 Mbit/s)*/
     
     ETH->MACCR|=ETH_MACCR_DM; // 1 - full duplex mode
-    ETH->MACCR&=~ETH_MACCR_IPCO; // 0 - IPv4 checksums disabled
-    ETH->MACCR&=~ETH_MACCR_TE; // transmit enable 
-    ETH->MACCR&=~ETH_MACCR_RE; // receive enable 
+	
+    //ETH->MACCR&=~ETH_MACCR_IPCO; // 0 - IPv4 checksums disabled
+    
     /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
     /*!<Ethernet MAC address >*/
     ETH->MACA0HR=0x1234; //16 bits (47:32) of the 6-byte MAC address0
     ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 	
 	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
+	/*!<Descriptor lists initialization>*/
+	/*!<The Receive descriptor list address register points to the start of the receive descriptor list.>*/
+	ETH->DMARDLAR = Eth::ReceiveDL; //write start address of recieve descriptor list array in special reg
+	/*!<Transmit descriptor list address register points to the start of the transmit descriptor list.>*/
+	ETH->DMATDLAR = Eth::TransmitDL; //write start address of recieve descriptor list array in special reg
+	/*!<for hardware counting of checksums transmit FIFO must configured for Store-and-forward mode (not in treashold control mode)>*/
+	ETH->DMAOMR |= ETH_DMAOMR_TSF;//transmission starts when a full frame resides in the Transmit FIFO. TTC - ignored
+	ETH->DMAOMR |= ETH_DMAOMR_RSF;//frame is read from the Rx FIFO after the complete frame has been written to it; RTC - ignored  
+	
+	/*!<Descriptors lists configuration>*/
+	/*!<Ethernet DMA bus mode register (ETH_DMABMR)>*/
+	 
+	/*<interrupts>*/
+	ETH->DMAIER|= ETH_DMAIER_NISE; //Normal interrupt enable
+	//ETH->DMAIER|= ETH_DMAIER_RIE; //Receive interrupt enable
+	//ETH->DMAIER|= ETH_DMAIER_TIE; //Receive interrupt enable
+	
+	ETH->MACCR|=ETH_MACCR_TE; // transmit enable 
+    ETH->MACCR|=ETH_MACCR_RE; // receive enable 
+	/*!< operation mode register >*/
+	
+	ETH->DMABMR&=!ETH_DMABMR_PBL_1// 1: 1-byte
 }
 
 
@@ -146,3 +171,43 @@ void Eth::smi_write(uint8_t reg_num, uint8_t val)
     ETH->MACMIIDR=val<<8;
     while(ETH->MACMIIAR & ETH_MACMIIAR_MB);    
 }
+//--------------------------------------------------------------------------------------------------------
+void Eth::descr_init(uint32_t TxAddr, uint32_t RxAddr)
+{
+	ReceiveDL[3]=RecievDL; //sets address of new descriptor (its the same)
+	TransmitDL[3]=TransmitDL; //sets address of new descriptor (its the same)
+	ReceiveDL[2]=RxAddr; //sets address of new descriptor (its the same)
+	TransmitDL[2]=TxAddr; //sets address of new descriptor (its the same)
+	/*!< Two descriptors indicates on data two buffers >*/
+	ReceiveDL[0] = 0;
+	ReceiveDL[1] = 0;
+	ReceiveDL[1] |= (2048); //size of Tx first buffer
+	
+	TransmitDL[0] = 0;
+	TransmitDL[0] |= (3<<28); //sets LS and FS - first and simultaniously last descriptor
+	TransmitDL[0] |= (3<<22); //11: IP Header checksum and payload checksum calculation and insertion are enabled, and pseudo-header checksum is calculated in hardware.
+	TransmitDL[0] |= (1<<21); //TER descriptor list reached its final descriptor
+	TransmitDL[1] = 0;
+	TransmitDL[1] |= (2048); //size of Tx first buffer
+}
+//-----------------------------------------------------------------------------------------------------------
+void Eth::receive_frame()
+{	
+	ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
+	ETH->DMAOMR |= ETH_DMAOMR_SR; //start reception (starts DMA polling)
+	//need timer		
+	ETH->DMAOMR &=~ ETH_DMAOMR_SR; //(ends DMA polling)
+}
+
+void Eth::transmit_frame()
+{
+	TransmitDL[0] |= (1<<31); //sets OWN bit to DMA
+	ETH->DMAOMR |= ETH_DMAOMR_ST; //start transmittion (starts DMA polling)
+	//need timer
+	ETH->DMAOMR &=~ ETH_DMAOMR_ST; //(ends DMA polling)
+}
+
+
+
+
+
