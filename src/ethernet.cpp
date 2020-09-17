@@ -7,9 +7,16 @@ Eth* Eth::pThis = nullptr;
 
 Eth::Eth(uint8_t* rxB,uint8_t* txB)
 {
+    for(uint8_t i=0; i<6;i++)
+    {frameTx.mac_dest[i] = mac_broadcast[i];}
+    for(uint8_t i=0; i<6;i++)
+    {frameTx.mac_src[i] = mac[i];}
+    frameTx.type = swap16(0x0806);   
+    
     RxBuf=rxB; TxBuf=txB;
     pThis=this;
     eth_init();
+    descr_init();
 }
 
 void Eth::eth_init()
@@ -118,7 +125,7 @@ void Eth::eth_init()
     /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
     /*!<Ethernet MAC address >*/
     ETH->MACA0HR=0x3412; //16 bits (47:32) of the 6-byte MAC address0
-    ETH->MACA0LR=0x56789012; //32 bits of the 6-byte MAC address0 	
+    ETH->MACA0LR=0x56789abc; //32 bits of the 6-byte MAC address0 	
 	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
 	/*!<Descriptor lists initialization>*/
 	/*!<The Receive descriptor list address register points to the start of the receive descriptor list.>*/
@@ -138,7 +145,7 @@ void Eth::eth_init()
     ETH->MACIMR|=ETH_MACIMR_PMTIM | ETH_MACIMR_TSTIM;//disable interrupts PMT and time stamps
 	ETH->DMAIER|= ETH_DMAIER_NISE; //Normal interrupt enable
 	ETH->DMAIER|= ETH_DMAIER_RIE; //Receive interrupt enable
-	//ETH->DMAIER|= ETH_DMAIER_TIE; //Transmit interrupt enable
+	ETH->DMAIER|= ETH_DMAIER_TIE; //Transmit interrupt enable
 	
 	ETH->MACCR|=ETH_MACCR_TE; // transmit enable 
     ETH->MACCR|=ETH_MACCR_RE; // receive enable 
@@ -194,8 +201,9 @@ void Eth::receive_frame()
 	ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
 	ETH->DMAOMR |= ETH_DMAOMR_SR; //start reception (starts DMA polling)
 	//need timer		
-    for(uint32_t i=0;i<50000000;i++);
+    for(uint32_t i=0;i<5000;i++);
 	ETH->DMAOMR &=~ ETH_DMAOMR_SR; //(ends DMA polling)
+    ReceiveDL[0] &=~ (1<<31); //0: sets OWN bit to CORE 
 }
 
 void Eth::transmit_frame(uint16_t size)
@@ -212,51 +220,74 @@ void Eth::transmit_frame(uint16_t size)
 void Eth::arp_read()
 {
     receive_frame();
-    FrameRx* fRx = RxBuf;
+    FrameRx* fRx = (FrameRx*)RxBuf;
     arp_recievePtr = (ARP*)(fRx+1);
-    if(fRx->type == swap(0806)) //ARP packet
+    if(fRx->type == swap16(0x0806)) //ARP packet
     {
-        if(fRx->mac_src[0]==0xff && fRx->mac_src[1]==0xff && fRx->mac_src[2]==0xff &&
-            fRx->mac_src[3]==0xff &&fRx->mac_src[4]==0xff &&fRx->mac_src[5]==0xff && 
+        if( fRx->mac_dest[0]==0xff && fRx->mac_dest[1]==0xff && fRx->mac_dest[2]==0xff &&
+            fRx->mac_dest[3]==0xff &&fRx->mac_dest[4]==0xff &&fRx->mac_dest[5]==0xff && 
             arp_recievePtr->ip_dst[0]==ip[0] && arp_recievePtr->ip_dst[1]==ip[1] &&
             arp_recievePtr->ip_dst[2]==ip[2] && arp_recievePtr->ip_dst[3]==ip[3]) //recieve broadcast need to send back mac
         {
             for(uint8_t i=0;i<6;i++)
-            {arp_recievePtr->macaddr_src[i] = mac[i]; fRx[i]=mac[i]; mac_dest[i] = fRx[i+6];}
-            arpSendAnswer();
+            {
+                mac_recieve[i] = fRx->mac_src[i];
+                
+                arp_recievePtr->macaddr_dst[i] = mac_recieve[i]; 
+                //fRx->mac_src[i] = mac_recieve[i];                
+            }
+            for(uint8_t i=0;i<4;i++)
+            {ip_receive[i] = arp_recievePtr->ip_src[i];} //write incoming ip address of requesting PC
+            arp_answer();
+            //RxBuf[0]=0;
         }
-        else if(fRx->mac_dest[0]==mac[0] && fRx->mac_dest[1]==mac[1] && fRx->mac_dest[2]==mac[2] &&
-                fRx->mac_dest[3]==mac[3] && fRx->mac_dest[4]==mac[4] && fRx->mac_dest[5]==mac[5]) //if answer (after send arp from micro) 
+        else if(fRx->mac_dest[0]==mac[0] && fRx->mac_dest[1]==mac[1] &&
+                fRx->mac_dest[2]==mac[2] && fRx->mac_dest[3]==mac[3] &&
+                fRx->mac_dest[4]==mac[4] && fRx->mac_dest[5]==mac[5]) //if answer (after send arp from micro) 
         {
             for(uint8_t i=0;i<6;i++)
-            {mac_dest[i] = arp_recievePtr->macaddr_dest[i];}                                    
+            {mac_recieve[i] = arp_recievePtr->macaddr_src[i];}                                    
         }
-    }
-
-    
+    }    
 }
 void Eth::arp_send()
 {
     for(uint8_t i=0; i<sizeof(frameTx);i++)
-    {TxBuf[i]=(uint8_t*)(&frameTx)+i;}
-    for(uint8_t i=sizeof(frameTx); i<sizeof(frameTx)+sizeof(ARP);i++)
-    {TxBuf[i]=(uint8_t*)(&arp_send)+(i-sizeof(frameTx));}
-    transmit_frame(42);
+    {TxBuf[i] = *((uint8_t*)(&frameTx)+i);}
+    for(uint8_t i=0; i<sizeof(arpInit);i++)
+    {
+        TxBuf[i + sizeof(frameTx)] = *((uint8_t*)(&arpInit)+i);
+    }
+    transmit_frame(44);
 }
 
-void Eth::arpSendAnswer() //TODO:
+void Eth::arp_answer() //TODO:
 {
-    FrameTx* fTx = TxBuf;
+    for(uint8_t i=0;i<6;i++)
+    {frameTx.mac_dest[i] = mac_recieve[i];}
+
+    //FrameTx* fTx = (FrameTx*)&frameTx;
+    arp_recievePtr = &arpInit;
+    arp_recievePtr->op = swap16(0x0002);
+    for(uint8_t i=0;i<6;i++)
+    {arp_recievePtr->macaddr_src[i] = mac[i];} // set source mac in ARP
+    for(uint8_t i=0;i<4;i++)
+    {arp_recievePtr->ip_src[i] = ip[i];} // set source mac in ARP
+    for(uint8_t i=0;i<6;i++)
+    {arp_recievePtr->macaddr_dst[i] = mac_recieve[i];} // set dest mac in ARP
+    for(uint8_t i=0;i<4;i++)
+    {arp_recievePtr->ip_dst[i] = ip_receive[i];} // set dest ip in ARP answer
+
     for(uint8_t i=0; i<sizeof(frameTx);i++)
-    {TxBuf[i]=(uint8_t*)(fTx)+i;}
-    for(uint8_t i=sizeof(frameTx); i<sizeof(frameTx)+sizeof(ARP); i++)
-    {TxBuf[i]=(uint8_t*)(arp_recievePtr)+(i-sizeof(frameTx));}
-    transmit_frame(42);
+    {TxBuf[i] = *((uint8_t*)(&frameTx)+i);}
+    for(uint8_t i=0; i<sizeof(ARP); i++)
+    {TxBuf[i+sizeof(frameTx)] = *((uint8_t*)(arp_recievePtr)+i);}
+    transmit_frame(44);
 }
 
-extern "C" ETH_IRQHandler()
+void ETH_IRQHandler(void)
 {
-    ETH->DMASR|=ETH_DMASR_RS; //clear bit of interrupt
+    //ETH->DMASR|=ETH_DMASR_RS; //clear bit of interrupt
     Eth::pThis->arpReceiveFlag=true;
 }
 
