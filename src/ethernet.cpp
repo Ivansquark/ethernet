@@ -3,8 +3,12 @@
 uint32_t Eth::ReceiveDL[4]={0};
 uint32_t Eth::TransmitDL[4]={0};
 
-Eth::Eth()
+Eth* Eth::pThis = nullptr;
+
+Eth::Eth(uint8_t* rxB,uint8_t* txB)
 {
+    RxBuf=rxB; TxBuf=txB;
+    pThis=this;
     eth_init();
 }
 
@@ -130,9 +134,10 @@ void Eth::eth_init()
 	/*!<Descriptors lists configuration>*/
 	/*!<Ethernet DMA bus mode register (ETH_DMABMR)>*/
 	 
-	/*<interrupts>*/
+	/*<____________interrupts____________________________>*/
+    ETH->MACIMR|=ETH_MACIMR_PMTIM | ETH_MACIMR_TSTIM;//disable interrupts PMT and time stamps
 	ETH->DMAIER|= ETH_DMAIER_NISE; //Normal interrupt enable
-	//ETH->DMAIER|= ETH_DMAIER_RIE; //Receive interrupt enable
+	ETH->DMAIER|= ETH_DMAIER_RIE; //Receive interrupt enable
 	//ETH->DMAIER|= ETH_DMAIER_TIE; //Transmit interrupt enable
 	
 	ETH->MACCR|=ETH_MACCR_TE; // transmit enable 
@@ -140,9 +145,9 @@ void Eth::eth_init()
 	
 	ETH->DMABMR&=~ETH_DMABMR_PBL;
 	ETH->DMABMR|=ETH_DMABMR_PBL_1Beat;// 1: 1-byte
+    NVIC_EnableIRQ(ETH_IRQn);
 }
-
-
+//--------------------------------------- SMI methods ----------------------------------------
 uint8_t Eth::smi_read(uint8_t reg_num)
 {
     uint16_t x=0;
@@ -165,12 +170,12 @@ void Eth::smi_write(uint8_t reg_num, uint8_t val)
     while(ETH->MACMIIAR & ETH_MACMIIAR_MB);    
 }
 //--------------------------------------------------------------------------------------------------------
-void Eth::descr_init(uint8_t* TxAddr, uint8_t* RxAddr)
+void Eth::descr_init()
 {
 	ReceiveDL[3] = (uint32_t)ReceiveDL; //sets address of new descriptor (its the same)
 	TransmitDL[3] = (uint32_t)TransmitDL; //sets address of new descriptor (its the same)
-	ReceiveDL[2] = (uint32_t)RxAddr; //sets address of new descriptor (its the same)
-	TransmitDL[2] = (uint32_t)TxAddr; //sets address of new descriptor (its the same)
+	ReceiveDL[2] = (uint32_t)RxBuf; //sets address of new descriptor (its the same)
+	TransmitDL[2] = (uint32_t)TxBuf; //sets address of new descriptor (its the same)
 	/*!< Two descriptors indicates on data two buffers >*/
 	ReceiveDL[0] = 0;
 	ReceiveDL[1] = 0;
@@ -204,7 +209,54 @@ void Eth::transmit_frame(uint16_t size)
 	ETH->DMAOMR &=~ ETH_DMAOMR_ST; //(ends DMA polling)
 }
 
+void Eth::arp_read()
+{
+    receive_frame();
+    FrameRx* fRx = RxBuf;
+    arp_recievePtr = (ARP*)(fRx+1);
+    if(fRx->type == swap(0806)) //ARP packet
+    {
+        if(fRx->mac_src[0]==0xff && fRx->mac_src[1]==0xff && fRx->mac_src[2]==0xff &&
+            fRx->mac_src[3]==0xff &&fRx->mac_src[4]==0xff &&fRx->mac_src[5]==0xff && 
+            arp_recievePtr->ip_dst[0]==ip[0] && arp_recievePtr->ip_dst[1]==ip[1] &&
+            arp_recievePtr->ip_dst[2]==ip[2] && arp_recievePtr->ip_dst[3]==ip[3]) //recieve broadcast need to send back mac
+        {
+            for(uint8_t i=0;i<6;i++)
+            {arp_recievePtr->macaddr_src[i] = mac[i]; fRx[i]=mac[i]; mac_dest[i] = fRx[i+6];}
+            arpSendAnswer();
+        }
+        else if(fRx->mac_dest[0]==mac[0] && fRx->mac_dest[1]==mac[1] && fRx->mac_dest[2]==mac[2] &&
+                fRx->mac_dest[3]==mac[3] && fRx->mac_dest[4]==mac[4] && fRx->mac_dest[5]==mac[5]) //if answer (after send arp from micro) 
+        {
+            for(uint8_t i=0;i<6;i++)
+            {mac_dest[i] = arp_recievePtr->macaddr_dest[i];}                                    
+        }
+    }
 
+    
+}
+void Eth::arp_send()
+{
+    for(uint8_t i=0; i<sizeof(frameTx);i++)
+    {TxBuf[i]=(uint8_t*)(&frameTx)+i;}
+    for(uint8_t i=sizeof(frameTx); i<sizeof(frameTx)+sizeof(ARP);i++)
+    {TxBuf[i]=(uint8_t*)(&arp_send)+(i-sizeof(frameTx));}
+    transmit_frame(42);
+}
 
+void Eth::arpSendAnswer() //TODO:
+{
+    FrameTx* fTx = TxBuf;
+    for(uint8_t i=0; i<sizeof(frameTx);i++)
+    {TxBuf[i]=(uint8_t*)(fTx)+i;}
+    for(uint8_t i=sizeof(frameTx); i<sizeof(frameTx)+sizeof(ARP); i++)
+    {TxBuf[i]=(uint8_t*)(arp_recievePtr)+(i-sizeof(frameTx));}
+    transmit_frame(42);
+}
 
+extern "C" ETH_IRQHandler()
+{
+    ETH->DMASR|=ETH_DMASR_RS; //clear bit of interrupt
+    Eth::pThis->arpReceiveFlag=true;
+}
 
