@@ -158,7 +158,7 @@ void Eth::transmit_frame(uint16_t size)
 void Eth::arp_read()
 {
     //receive_frame();
-    FrameRx* fRx = (FrameRx*)RxBuf;
+    FrameX* fRx = (FrameX*)RxBuf;
     arp_recievePtr = (ARP*)(fRx+1);
     if(fRx->type == swap16(0x0806)) //ARP packet
     {
@@ -188,7 +188,7 @@ void Eth::arp_read()
 }
 void Eth::arp_send()
 {
-    FrameTx arpTx = {0xff,0xff,0xff,0xff,0xff,0xff,0x32,0x12,0x56,0x78,0x9a,0xbc,swap16(0x0806)};    
+    FrameX arpTx = {0xff,0xff,0xff,0xff,0xff,0xff,0x32,0x12,0x56,0x78,0x9a,0xbc,swap16(0x0806)};    
     for(uint8_t i=0; i<sizeof(arpTx);i++)
     {TxBuf[i] = *((uint8_t*)(&arpTx)+i);}
     for(uint8_t i=0; i<sizeof(arpSend);i++)

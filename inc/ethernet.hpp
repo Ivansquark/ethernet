@@ -9,8 +9,8 @@ class Eth
 {
 public:
     Eth(uint8_t* rxB,uint8_t* txB);		
-	FrameRx frameRx{0};//memory allocation on stack
-	FrameTx frameTx{0};
+	FrameX frameRx{0};//memory allocation on stack
+	FrameX frameTx{0};
 	ARP* arp_recievePtr{nullptr};
 	void arp_read();
 	void arp_send();

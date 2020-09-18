@@ -1,15 +1,10 @@
-struct FrameRx
+struct FrameX
 {
 	uint8_t mac_dest[6];
 	uint8_t mac_src[6];
 	uint16_t type;
 };
-struct FrameTx
-{
-	uint8_t mac_dest[6];
-	uint8_t mac_src[6];
-	uint16_t type;
-};
+
 struct ARP
 {
 	uint16_t net;
