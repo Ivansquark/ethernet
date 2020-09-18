@@ -32,12 +32,14 @@ public:
 	ARP arpInit={swap16(0x0001),swap16(0x0800),0x06,0x04,swap16(0x0001),
 			 	 mac[0],mac[1],mac[2],mac[3],mac[4],mac[5],ip[0],ip[1],ip[2],ip[3],
 			 	 0xff,0xff,0xff,0xff,0xff,0xff, /*ip_dest*/ 192,168,0,103};	
+	ARP arpSend = arpInit;			  
+	uint8_t mac_recieve[6]={0};
 private:
     void eth_init();
 	void descr_init();
 	constexpr uint16_t swap16(uint16_t val) //__attribute((always_inline))
 	{return ((val>>8)&0xFF) | ((val<<8)&0xFF00);}
-	uint8_t mac_recieve[6]={0};
+	
 	uint8_t ip_receive[4]={0};
 	uint8_t* RxBuf;
 	uint8_t* TxBuf;

@@ -23,9 +23,9 @@ struct ARP
 	uint8_t ip_dst[4];
 };
 
-constexpr uint8_t IP_ICMP 1;
-constexpr uint8_t IP_TCP 6;
-constexpr uint8_t IP_UDP 17;
+constexpr uint8_t IP_ICMP= 1;
+constexpr uint8_t IP_TCP= 6;
+constexpr uint8_t IP_UDP=17;
 
 struct IP_pkt 
 {

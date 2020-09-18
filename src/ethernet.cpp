@@ -66,9 +66,9 @@ void Eth::eth_init()
     /*!<Ethernet MAC MII address register (ETH_MACMIIAR) for checking DA in frames>*/    
     ETH->MACA0HR=0x3412; //16 bits (47:32) of the 6-byte MAC address0
     ETH->MACA0LR=0x56789abc; //32 bits of the 6-byte MAC address0 	
-	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
+	//ETH->MACFFR|=ETH_MACFFR_RA; //receive all
     /*!<Destination address inverse filtering>*/
-    //ETH->MACFFR|=ETH_MACFFR_DAIF;
+    ETH->MACFFR|=ETH_MACFFR_DAIF;
 
 	/*!<Descriptor lists initialization>*/
 	/*!<The Receive descriptor list address register points to the start of the receive descriptor list.>*/
@@ -123,6 +123,7 @@ void Eth::descr_init()
 	/*!< Two descriptors indicates on data two buffers (use one descriptor) >*/
 	ReceiveDL[0] = 0;
 	ReceiveDL[1] = 0;
+    ReceiveDL[1] |= (1<<14);
 	ReceiveDL[1] |= (2048); //size of Tx first buffer
 	
 	TransmitDL[0] = 0;
@@ -131,32 +132,32 @@ void Eth::descr_init()
 	TransmitDL[0] |= (1<<21); //TER descriptor list reached its final descriptor
 	TransmitDL[1] = 0;
 	TransmitDL[1] |= (2048); //size of Tx first buffer
+    ETH->DMAOMR |= ETH_DMAOMR_SR; //start reception (starts DMA polling)	
+    ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA    
 }
 //-----------------------------------------------------------------------------------------------------------
 void Eth::receive_frame()
 {	
-	ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
-	ETH->DMAOMR |= ETH_DMAOMR_SR; //start reception (starts DMA polling)
+	//ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
 	//need timer		
-    for(uint32_t i=0;i<5000;i++);
-	ETH->DMAOMR &=~ ETH_DMAOMR_SR; //(ends DMA polling)
-    ReceiveDL[0] &=~ (1<<31); //0: sets OWN bit to CORE 
+    //for(uint32_t i=0;i<500;i++);
+	//ETH->DMAOMR &=~ ETH_DMAOMR_SR; //(ends DMA polling)
+    //ReceiveDL[0] &=~ (1<<31); //0: sets OWN bit to CORE 
 }
 
 void Eth::transmit_frame(uint16_t size)
 {
+    TransmitDL[1] = (size); //size of Tx first buffer
 	TransmitDL[0] |= (1<<31); //sets OWN bit to DMA
-    TransmitDL[1] = 0;
-    TransmitDL[1] |= (size); //size of Tx first buffer
-	ETH->DMAOMR |= ETH_DMAOMR_ST; //start transmittion (starts DMA polling)
+    ETH->DMAOMR |= ETH_DMAOMR_ST; //start transmittion (starts DMA polling)	
 	//need timer
-    for(uint32_t i=0;i<50000000;i++);
+    //for(uint32_t i=0;i<100;i++);
 	ETH->DMAOMR &=~ ETH_DMAOMR_ST; //(ends DMA polling)
 }
 
 void Eth::arp_read()
 {
-    receive_frame();
+    //receive_frame();
     FrameRx* fRx = (FrameRx*)RxBuf;
     arp_recievePtr = (ARP*)(fRx+1);
     if(fRx->type == swap16(0x0806)) //ARP packet
@@ -175,7 +176,6 @@ void Eth::arp_read()
             for(uint8_t i=0;i<4;i++)
             {ip_receive[i] = arp_recievePtr->ip_src[i];} //write incoming ip address of requesting PC
             arp_answer();
-            //RxBuf[0]=0;
         }
         else if(fRx->mac_dest[0]==mac[0] && fRx->mac_dest[1]==mac[1] &&
                 fRx->mac_dest[2]==mac[2] && fRx->mac_dest[3]==mac[3] &&
@@ -188,11 +188,12 @@ void Eth::arp_read()
 }
 void Eth::arp_send()
 {
-    for(uint8_t i=0; i<sizeof(frameTx);i++)
-    {TxBuf[i] = *((uint8_t*)(&frameTx)+i);}
-    for(uint8_t i=0; i<sizeof(arpInit);i++)
+    FrameTx arpTx = {0xff,0xff,0xff,0xff,0xff,0xff,0x32,0x12,0x56,0x78,0x9a,0xbc,swap16(0x0806)};    
+    for(uint8_t i=0; i<sizeof(arpTx);i++)
+    {TxBuf[i] = *((uint8_t*)(&arpTx)+i);}
+    for(uint8_t i=0; i<sizeof(arpSend);i++)
     {
-        TxBuf[i + sizeof(frameTx)] = *((uint8_t*)(&arpInit)+i);
+        TxBuf[i + sizeof(arpTx)] = *((uint8_t*)(&arpSend)+i);
     }
     transmit_frame(44);
 }
@@ -223,7 +224,8 @@ void Eth::arp_answer() //TODO:
 
 void ETH_IRQHandler(void)
 {
-    //ETH->DMASR|=ETH_DMASR_RS; //clear bit of interrupt
+    /*!< receive descriptor automatically starts belonging to host >*/
+    ETH->DMASR|=ETH_DMASR_RS; //clear bit of interrupt
     Eth::pThis->arpReceiveFlag=true;
 }
 
