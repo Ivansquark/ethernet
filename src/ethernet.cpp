@@ -1,7 +1,7 @@
 #include "ethernet.hpp"
 
 uint32_t Eth::ReceiveDL[4]={0};
-uint32_t Eth::TransmitDL[4]={0};
+uint32_t Eth::TransmitDL[4]={0}; //static for creating not in stack
 
 Eth* Eth::pThis = nullptr;
 
@@ -22,90 +22,33 @@ Eth::Eth(uint8_t* rxB,uint8_t* txB)
 void Eth::eth_init()
 {
     /*GPIOs RCC*/
-    RCC->AHB1ENR|=RCC_AHB1ENR_GPIOAEN;
-    RCC->AHB1ENR|=RCC_AHB1ENR_GPIOBEN;
-    RCC->AHB1ENR|=RCC_AHB1ENR_GPIOCEN;
-
-    /*! PA1 - ETH_RMII _REF_CLK */    
-    GPIOA->MODER|=GPIO_MODER_MODER1_1;
-    GPIOA->MODER&=~GPIO_MODER_MODER1_0; //1:0 alt func
-    GPIOA->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR1; //1:1 max speed
-    GPIOA->AFR[0] |= (11<<4); //ethernet
-
-    /*! < PA2 ETH _MDIO SMI data input output for control physical layer>*/
-    GPIOA->MODER|=GPIO_MODER_MODER2_1;
-    GPIOA->MODER&=~GPIO_MODER_MODER2_0; //1:0 alt func
-    GPIOA->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR2; //1:1 max speed
-    GPIOA->AFR[0] |= (11<<8); //ethernet
-
-    /*! < PA7 ETH_RMII _CRS_DV >*/
-    GPIOA->MODER|=GPIO_MODER_MODER7_1;
-    GPIOA->MODER&=~GPIO_MODER_MODER7_0; //1:0 alt func
-    GPIOA->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR7; //1:1 max speed
-    GPIOA->AFR[0] |= (11<<28); //ethernet
-
-    /*! < PB11  ETH _RMII_TX_EN >*/
-    GPIOB->MODER|=GPIO_MODER_MODER11_1;
-    GPIOB->MODER&=~GPIO_MODER_MODER11_0; //1:0 alt func
-    GPIOB->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR11; //1:1 max speed
-    GPIOB->AFR[1] |= (11<<12); //ethernet
-
-    /*! < PB12  ETH _RMII_TXD0 >*/
-    GPIOB->MODER|=GPIO_MODER_MODER12_1;
-    GPIOB->MODER&=~GPIO_MODER_MODER12_0; //1:0 alt func
-    GPIOB->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR12; //1:1 max speed
-    GPIOB->AFR[1] |= (11<<16); //ethernet
-
-    /*! < PB13  ETH _RMII_TXD1 >*/
-    GPIOB->MODER|=GPIO_MODER_MODER13_1;
-    GPIOB->MODER&=~GPIO_MODER_MODER13_0; //1:0 alt func
-    GPIOB->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR13; //1:1 max speed
-    GPIOB->AFR[1] |= (11<<20); //ethernet
-    
-    /*!< PC1 - ETH _MDC SMI clock for control physical layer> */    
-    GPIOC->MODER|=GPIO_MODER_MODER1_1;
-    GPIOC->MODER&=~GPIO_MODER_MODER1_0; //1:0 alt func
-    GPIOC->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR1; //1:1 max speed
-    GPIOC->AFR[0] |= (11<<4); //ethernet
-
-    /*!< PC4 - ETH_RMII_RXD0 > */    
-    GPIOC->MODER|=GPIO_MODER_MODER4_1;
-    GPIOC->MODER&=~GPIO_MODER_MODER4_0; //1:0 alt func
-    GPIOC->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR4; //1:1 max speed
-    GPIOC->AFR[0] |= (11<<16); //ethernet
-
-    /*!< PC5 - ETH _RMII_RXD1 > */    
-    GPIOC->MODER|=GPIO_MODER_MODER5_1;
-    GPIOC->MODER&=~GPIO_MODER_MODER5_0; //1:0 alt func
-    GPIOC->OSPEEDR|=GPIO_OSPEEDER_OSPEEDR5; //1:1 max speed
-    GPIOC->AFR[0] |= (11<<20); //ethernet
-    
-    RCC->APB2ENR|=RCC_APB2ENR_SYSCFGEN; /* Enable SYSCFG Clock */
+    RCC->AHB1ENR|=(RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN);
+    /*!< PA1-ETH_RMII_REF_CLK  PA2-ETH_MDIO SMI PA7-ETH_RMII_CRS_DV >*/    
+    GPIOA->MODER|=(GPIO_MODER_MODER1_1 | GPIO_MODER_MODER2_1 | GPIO_MODER_MODER7_1);
+    GPIOA->MODER&=~(GPIO_MODER_MODER1_0 | GPIO_MODER_MODER2_0 | GPIO_MODER_MODER7_0); //1:0 alt func
+    GPIOA->OSPEEDR|=(GPIO_OSPEEDER_OSPEEDR1 | GPIO_OSPEEDER_OSPEEDR2 | GPIO_OSPEEDER_OSPEEDR7); //1:1 max speed
+    GPIOA->AFR[0] |= (11<<4)|(11<<8)|(11<<28); //ethernet    
+    /*! < PB11-ETH _RMII_TX_EN PB12-ETH _RMII_TXD0 PB13-ETH_RMII_TXD1 >*/
+    GPIOB->MODER|=(GPIO_MODER_MODER11_1 | GPIO_MODER_MODER12_1 | GPIO_MODER_MODER13_1);
+    GPIOB->MODER&=~(GPIO_MODER_MODER11_0 | GPIO_MODER_MODER12_0 | GPIO_MODER_MODER13_0); //1:0 alt func
+    GPIOB->OSPEEDR|=(GPIO_OSPEEDER_OSPEEDR11 | GPIO_OSPEEDER_OSPEEDR12 | GPIO_OSPEEDER_OSPEEDR13); //1:1 max speed
+    GPIOB->AFR[1] |= (11<<12)|(11<<16)|(11<<20); //ethernet    
+    /*!< PC1-ETH_MDC SMI PC4-ETH_RMII_RXD0 PC5-ETH_RMII_RXD1 >*/    
+    GPIOC->MODER|=(GPIO_MODER_MODER1_1 | GPIO_MODER_MODER4_1 | GPIO_MODER_MODER5_1);
+    GPIOC->MODER&=~(GPIO_MODER_MODER1_0|GPIO_MODER_MODER4_0|GPIO_MODER_MODER5_0); //1:0 alt func
+    GPIOC->OSPEEDR|=(GPIO_OSPEEDER_OSPEEDR1|GPIO_OSPEEDER_OSPEEDR4|GPIO_OSPEEDER_OSPEEDR5); //1:1 max speed
+    GPIOC->AFR[0] |= (11<<4)|(11<<16)|(11<<20); //ethernet
+    /*!< enable SYSCFG for RMII PHY interface >*/    
+    RCC->APB2ENR|=RCC_APB2ENR_SYSCFGEN; /* Enable SYSCFG Clock for RMII select*/
 	SYSCFG->PMC|=SYSCFG_PMC_MII_RMII_SEL; //RMII PHY interface is selected	
-
-    RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACTXEN; // Ethernet Transmission clock enable
-    RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACRXEN; //Ethernet Reception clock enable
+    /*< Ethernet RCC (Rx, Tx, MAC) >*/
+    RCC->AHB1ENR|=(RCC_AHB1ENR_ETHMACTXEN | RCC_AHB1ENR_ETHMACRXEN | RCC_AHB1ENR_ETHMACEN); 
     //RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACPTPEN; // Ethernet PTP clock enable
-    RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACEN; // MAC enabled
     
 	/*!<The bus mode register establishes the bus operating modes for the DMA.>*/
 	/* Set the SWR bit: resets all MAC subsystem internal registers and logic */
 	ETH->DMABMR|=ETH_DMABMR_SR;//Software reset
-	/* Wait for software reset */
-	//while (((heth->Instance)->DMABMR & ETH_DMABMR_SR) != (uint32_t)RESET)
-	//{
-	//	/* Check for the Timeout */
-	//	if((HAL_GetTick() - tickstart ) > ETH_TIMEOUT_SWRESET)
-	//	{     
-	//	heth->State= HAL_ETH_STATE_TIMEOUT;	
-	//	/* Process Unlocked */
-	//	__HAL_UNLOCK(heth);		
-	//	/* Note: The SWR is not performed if the ETH_RX_CLK or the ETH_TX_CLK are  
-	//		not available, please check your external PHY or the IO configuration */
-	//	return HAL_TIMEOUT;
-	//	}
-	//}
-		
+    for(uint32_t i=0;i<1000000;i++); //wait for software reset		
     /*-------------------- PHY initialization and configuration ----------------*/
     /*!<SMI configuration>*/
     ETH->MACMIIAR|=(1<<11);//PHY address = 1 !!!!
@@ -114,19 +57,19 @@ void Eth::eth_init()
     /*!< ethernet mac configuration register>*/
     uint8_t smiReg0 = smi_read(0);
     if(smiReg0>>5) //if 100 Mb/s   /*!<suppose that always full duplex>*/
-    {
-        ETH->MACCR|=ETH_MACCR_FES; //1 - 1: 100 Mbit/s
-    }else {ETH->MACCR&=~ETH_MACCR_FES;} /* 0 - (0: 10 Mbit/s)*/
-    
+    {ETH->MACCR|=ETH_MACCR_FES;} //1 - 1: 100 Mbit/s    
+    else {ETH->MACCR&=~ETH_MACCR_FES;} /* 0 - (0: 10 Mbit/s)*/    
     ETH->MACCR|=ETH_MACCR_DM; // 1 - full duplex mode
 	
     //ETH->MACCR&=~ETH_MACCR_IPCO; // 0 - IPv4 checksums disabled
-    
-    /*!<Ethernet MAC MII address register (ETH_MACMIIAR)>*/
-    /*!<Ethernet MAC address >*/
+
+    /*!<Ethernet MAC MII address register (ETH_MACMIIAR) for checking DA in frames>*/    
     ETH->MACA0HR=0x3412; //16 bits (47:32) of the 6-byte MAC address0
     ETH->MACA0LR=0x56789abc; //32 bits of the 6-byte MAC address0 	
 	ETH->MACFFR|=ETH_MACFFR_RA; //receive all
+    /*!<Destination address inverse filtering>*/
+    //ETH->MACFFR|=ETH_MACFFR_DAIF;
+
 	/*!<Descriptor lists initialization>*/
 	/*!<The Receive descriptor list address register points to the start of the receive descriptor list.>*/
 	ETH->DMARDLAR = (uint32_t)ReceiveDL; //write start address of recieve descriptor list array in special reg
@@ -138,20 +81,14 @@ void Eth::eth_init()
     ETH->DMAOMR |= ETH_DMAOMR_TSF;//transmission starts when a full frame resides in the Transmit FIFO. TTC - ignored
 	ETH->DMAOMR |= ETH_DMAOMR_RSF;//frame is read from the Rx FIFO after the complete frame has been written to it; RTC - ignored  
 	
-	/*!<Descriptors lists configuration>*/
-	/*!<Ethernet DMA bus mode register (ETH_DMABMR)>*/
-	 
-	/*<____________interrupts____________________________>*/
-    ETH->MACIMR|=ETH_MACIMR_PMTIM | ETH_MACIMR_TSTIM;//disable interrupts PMT and time stamps
-	ETH->DMAIER|= ETH_DMAIER_NISE; //Normal interrupt enable
-	ETH->DMAIER|= ETH_DMAIER_RIE; //Receive interrupt enable
-	ETH->DMAIER|= ETH_DMAIER_TIE; //Transmit interrupt enable
-	
 	ETH->MACCR|=ETH_MACCR_TE; // transmit enable 
     ETH->MACCR|=ETH_MACCR_RE; // receive enable 
-	
+	/*!< DMA configuration >*/
 	ETH->DMABMR&=~ETH_DMABMR_PBL;
 	ETH->DMABMR|=ETH_DMABMR_PBL_1Beat;// 1: 1-byte
+    /*<____________interrupts____________________________>*/
+    ETH->MACIMR|=ETH_MACIMR_PMTIM | ETH_MACIMR_TSTIM;//disable interrupts PMT and time stamps
+	ETH->DMAIER|= (ETH_DMAIER_NISE|ETH_DMAIER_RIE|ETH_DMAIER_TIE); //Normal and RxTx interrupt enable
     NVIC_EnableIRQ(ETH_IRQn);
 }
 //--------------------------------------- SMI methods ----------------------------------------
@@ -161,7 +98,7 @@ uint8_t Eth::smi_read(uint8_t reg_num)
     ETH->MACMIIAR&=~ETH_MACMIIAR_MW;//read ready    
     ETH->MACMIIAR|=(reg_num&0x1F)<<6; //write number of PHY register in reg
     ETH->MACMIIAR|=ETH_MACMIIAR_MB;//to start
-    for(uint8_t i=0;i<2;i++)
+    for(uint8_t i=0;i<2;i++) //two times because for one is not initialized
     {
         x=ETH->MACMIIDR;
         while(ETH->MACMIIAR & ETH_MACMIIAR_MB);        
@@ -183,7 +120,7 @@ void Eth::descr_init()
 	TransmitDL[3] = (uint32_t)TransmitDL; //sets address of new descriptor (its the same)
 	ReceiveDL[2] = (uint32_t)RxBuf; //sets address of new descriptor (its the same)
 	TransmitDL[2] = (uint32_t)TxBuf; //sets address of new descriptor (its the same)
-	/*!< Two descriptors indicates on data two buffers >*/
+	/*!< Two descriptors indicates on data two buffers (use one descriptor) >*/
 	ReceiveDL[0] = 0;
 	ReceiveDL[1] = 0;
 	ReceiveDL[1] |= (2048); //size of Tx first buffer
@@ -231,8 +168,7 @@ void Eth::arp_read()
         {
             for(uint8_t i=0;i<6;i++)
             {
-                mac_recieve[i] = fRx->mac_src[i];
-                
+                mac_recieve[i] = fRx->mac_src[i];                
                 arp_recievePtr->macaddr_dst[i] = mac_recieve[i]; 
                 //fRx->mac_src[i] = mac_recieve[i];                
             }

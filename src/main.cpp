@@ -19,6 +19,7 @@ int main()
     font.print(10,50,0x00ff,font.arr,0);
     eth.receive_frame();
 	for(uint8_t i=0;i<60;i++)    
+    __enable_irq();
     
     //uint8_t y=0;
     while(1)

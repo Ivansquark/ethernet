@@ -1,40 +1,15 @@
 #ifndef ETHERNET_HPP
 #define ETHERNET_HPP
 #include "stm32f4xx.h"
+#include "internet_protocols.hpp"
 
 extern "C" void ETH_IRQHandler(void);
-
-struct ARP
-{
-	uint16_t net;
-	uint16_t protocol;
-	uint8_t mac_len;
-	uint8_t ip_len;
-	uint16_t op; //1-request, 2-answer
-	uint8_t macaddr_src[6];
-	uint8_t ip_src[4];
-	uint8_t macaddr_dst[6];
-	uint8_t ip_dst[4];
-};
-struct FrameRx
-{
-	uint8_t mac_dest[6];
-	uint8_t mac_src[6];
-	uint16_t type;
-};
-struct FrameTx
-{
-	uint8_t mac_dest[6];
-	uint8_t mac_src[6];
-	uint16_t type;
-};
 
 class Eth
 {
 public:
-    Eth(uint8_t* rxB,uint8_t* txB);	
-	
-	FrameRx frameRx{0};
+    Eth(uint8_t* rxB,uint8_t* txB);		
+	FrameRx frameRx{0};//memory allocation on stack
 	FrameTx frameTx{0};
 	ARP* arp_recievePtr{nullptr};
 	void arp_read();
@@ -53,19 +28,16 @@ public:
 	const uint8_t ip[4] = {192,168,0,200};
 	const uint8_t mac[6] = {0x32,0x12,0x56,0x78,0x9a,0xbc};
 	const uint8_t mac_broadcast[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
+	/*!< memory allocation for ARP struct >*/
 	ARP arpInit={swap16(0x0001),swap16(0x0800),0x06,0x04,swap16(0x0001),
-			 mac[0],mac[1],mac[2],mac[3],mac[4],mac[5],ip[0],ip[1],ip[2],ip[3],
-			 0xff,0xff,0xff,0xff,0xff,0xff, /*ip_dest*/ 192,168,0,103};
-	uint8_t mac_recieve[6]={0};
+			 	 mac[0],mac[1],mac[2],mac[3],mac[4],mac[5],ip[0],ip[1],ip[2],ip[3],
+			 	 0xff,0xff,0xff,0xff,0xff,0xff, /*ip_dest*/ 192,168,0,103};	
 private:
     void eth_init();
 	void descr_init();
 	constexpr uint16_t swap16(uint16_t val) //__attribute((always_inline))
-	{
-		return ((val>>8)&0xFF) | ((val<<8)&0xFF00);
-	}
-	
-	
+	{return ((val>>8)&0xFF) | ((val<<8)&0xFF00);}
+	uint8_t mac_recieve[6]={0};
 	uint8_t ip_receive[4]={0};
 	uint8_t* RxBuf;
 	uint8_t* TxBuf;
