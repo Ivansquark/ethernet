@@ -167,8 +167,12 @@ void Eth::frame_read()
 void Eth::arp_read()
 {
     arp_receivePtr = (ARP*)(fRx+1);    
-    if( fRx->mac_dest[0]==0xff && fRx->mac_dest[1]==0xff && fRx->mac_dest[2]==0xff &&
-        fRx->mac_dest[3]==0xff &&fRx->mac_dest[4]==0xff &&fRx->mac_dest[5]==0xff && 
+    if((fRx->mac_dest[0]==0xff || fRx->mac_dest[0]==mac[0]) && 
+       (fRx->mac_dest[1]==0xff || fRx->mac_dest[1]==mac[1]) &&
+       (fRx->mac_dest[2]==0xff || fRx->mac_dest[2]==mac[2]) &&
+       (fRx->mac_dest[3]==0xff || fRx->mac_dest[3]==mac[3]) &&
+       (fRx->mac_dest[4]==0xff || fRx->mac_dest[4]==mac[4]) &&
+       (fRx->mac_dest[5]==0xff || fRx->mac_dest[5]==mac[5]) && 
         arp_receivePtr->ip_dst[0]==ip[0] && arp_receivePtr->ip_dst[1]==ip[1] &&
         arp_receivePtr->ip_dst[2]==ip[2] && arp_receivePtr->ip_dst[3]==ip[3]) //recieve broadcast need to send back mac
     {
@@ -231,6 +235,10 @@ void Eth::ip_read()
     {
         icmp_read();
     }
+    else if (ip_receivePtr->prt == IP_UDP)
+    {
+        udp_read();
+    }
     //IPflag=true;    
 }
 void Eth::icmp_read()
@@ -270,11 +278,67 @@ void Eth::icmp_read()
         transmit_frame(total_len);
     }
     else if(icmp_receivePtr->msg_type==ICMP_REPLY)
-    {
-
-    }    
+    {    }    
 }
-
+void Eth::udp_read()
+{
+    udp_receivePtr = (UDP*)(ip_receivePtr+1);
+    if(udp_receivePtr->port_dst == swap16(udp_port))
+    {
+        udp_initReply();
+        UDPflag = true;
+        uint8_t arr[]="jopa";
+        udp_write(arr,5);
+    }
+}
+void Eth::udp_initReply()
+{
+    /*!< save received frame information for deferred reply >*/
+    for(uint8_t i=0; i<sizeof(FrameX); i++)
+    {*((uint8_t*)&frameRx+i) = RxBuf[i];}
+    /*! need to exchange mac SA and DA*/
+    for(uint8_t i=0;i<6;i++)
+    {
+        frameRx.mac_dest[i]=frameRx.mac_src[i];
+        frameRx.mac_src[i] = mac[i];
+    }
+    /*!< save received IP information for deferred reply >*/
+    for(uint8_t i=0; i<sizeof(IP); i++)
+    {*((uint8_t*)&IP_received+i) = RxBuf[i+sizeof(FrameX)];}
+    /*!< need to exchange ip SA and DA>*/
+    for(uint8_t i=0;i<4;i++)
+    {
+        IP_received.ip_dst[i] = IP_received.ip_src[i];
+        IP_received.ip_src[i] = ip[i];
+    }
+    /*!< save received UDP information for deferred reply >*/
+    for(uint8_t i=0; i<sizeof(UDP); i++)
+    {*((uint8_t*)&UDP_received+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)];}
+    /*!< need to exchange UDP ports >*/
+    uint16_t bufPort = UDP_received.port_src;
+    UDP_received.port_src = UDP_received.port_dst;
+    UDP_received.port_dst = bufPort;
+    /*!< save received UDP data information for deferred reply >*/
+    for(uint8_t i=0; i<(swap16(UDP_received.len)-sizeof(UDP)); i++)
+    {*((uint8_t*)((UDP*)&UDP_data)+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)];}
+}
+void Eth::udp_write(uint8_t* data,uint16_t len)
+{
+    uint16_t ip_len = sizeof(IP) + sizeof(UDP) + len;
+    uint16_t udp_len = sizeof(UDP) + len;
+    uint16_t length = sizeof(FrameX)+sizeof(IP)+sizeof(UDP)+len; 
+    IP_received.len = swap16(ip_len); 
+    UDP_received.len = swap16(udp_len);
+    for (uint8_t i=0;i<sizeof(FrameX);i++)
+    {TxBuf[i] = *((uint8_t*)(&frameRx)+i);}
+    for (uint8_t i=0;i<sizeof(IP);i++)
+    {TxBuf[i+sizeof(FrameX)] = *((uint8_t*)(&IP_received)+i);}        
+    for (uint8_t i=0;i<sizeof(UDP);i++)
+    {TxBuf[i+sizeof(FrameX)+sizeof(IP)] = *((uint8_t*)(&UDP_received)+i);}
+    for (uint8_t i=0;i<len;i++)
+    {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)] = *((uint8_t*)(data)+i);}
+    transmit_frame(length);    
+}
 
 //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 void ETH_IRQHandler(void)

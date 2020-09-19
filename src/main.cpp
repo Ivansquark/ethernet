@@ -42,13 +42,13 @@ int main()
         if(eth.ReceiveFlag)
         {
             eth.frame_read();
-            if(eth.IPflag)
-            {
-                for(uint8_t i=0;i<sizeof(IP);i++)
+            if(eth.UDPflag)
+            {                
+                for(uint8_t i=0;i<(eth.swap16(eth.udp_receivePtr->len)-sizeof(UDP));i++)
                 {
-                    uart.sendByte(*((uint8_t*)eth.ip_receivePtr+i));
+                    uart.sendByte(*((uint8_t*)(eth.udp_receivePtr+1)+i));
                 }
-                eth.IPflag=false;
+                eth.UDPflag=false;
             }
             eth.ReceiveFlag=false;
             Eth::pThis->ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA

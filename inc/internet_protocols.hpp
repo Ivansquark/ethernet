@@ -1,20 +1,20 @@
 constexpr uint16_t ARP_i= 0x0806;
 constexpr uint16_t IPv4_i= 0x0800;
 constexpr uint16_t IPv6_i= 0x08dd;
+//-------------------------------------------
 constexpr uint8_t IP_ICMP= 1;
 constexpr uint8_t IP_TCP= 6;
 constexpr uint8_t IP_UDP=17;
-
+//-------------------------------------------
 constexpr uint8_t ICMP_REQ = 8;
 constexpr uint8_t ICMP_REPLY = 0; 
-
+//-------------------------------------------
 struct FrameX
 {
 	uint8_t mac_dest[6];
 	uint8_t mac_src[6];
 	uint16_t type;
 };
-
 struct ARP
 {
 	uint16_t net;
@@ -27,7 +27,6 @@ struct ARP
 	uint8_t macaddr_dst[6];
 	uint8_t ip_dst[4];
 };
-
 struct IP 
 {
   uint8_t verlen; //protocol version and header length
@@ -39,10 +38,8 @@ struct IP
   uint8_t prt; //protocol type
   uint16_t cs; //header check sum
   uint8_t ip_src[4]; //IP-SA
-  uint8_t ip_dst[4]; //IP-DA
-  uint8_t data[]; //data
+  uint8_t ip_dst[4]; //IP-DA  
 };
-
 struct ICMP
 {
 	uint8_t msg_type;
@@ -51,4 +48,10 @@ struct ICMP
 	uint16_t pack_id;
 	uint16_t pack_num;
 };
-
+struct UDP
+{
+	uint16_t port_src;
+	uint16_t port_dst;
+	uint16_t len;
+	uint16_t udp_checksum;
+};
