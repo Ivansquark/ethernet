@@ -24,10 +24,10 @@ int main()
     //uint8_t y=0;
     eth.arp_send();
     for(uint32_t i=0;i<50000000;i++);
-    eth.arp_read();
+    eth.frame_read();
     for(uint8_t i=0;i<6;i++)
     {uart.sendByte(eth.mac_recieve[i]);eth.mac_recieve[i]=0;}  
-    eth.arpReceiveFlag=false;
+    eth.ReceiveFlag=false;
     while(1)
     {
         //eth.arp_send();
@@ -39,19 +39,26 @@ int main()
         //eth.arp_read();                
 	           
         //Eth::pThis->ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA     
-        if(eth.arpReceiveFlag)
+        if(eth.ReceiveFlag)
         {
-            eth.arp_read();
-            eth.arpReceiveFlag=false;
+            eth.frame_read();
+            if(eth.IPflag)
+            {
+                for(uint8_t i=0;i<sizeof(IP);i++)
+                {
+                    uart.sendByte(*((uint8_t*)eth.ip_receivePtr+i));
+                }
+                eth.IPflag=false;
+            }
+            eth.ReceiveFlag=false;
             Eth::pThis->ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
-            //ETH->DMAOMR |= ETH_DMAOMR_SR; //start reception (starts DMA polling)    
-            //uart.sendStr("opa");
-            
+            //uart.sendStr("opa");            
         }
         else
         {
              
         }
+
             
         
     }

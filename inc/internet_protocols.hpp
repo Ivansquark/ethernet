@@ -1,3 +1,13 @@
+constexpr uint16_t ARP_i= 0x0806;
+constexpr uint16_t IPv4_i= 0x0800;
+constexpr uint16_t IPv6_i= 0x08dd;
+constexpr uint8_t IP_ICMP= 1;
+constexpr uint8_t IP_TCP= 6;
+constexpr uint8_t IP_UDP=17;
+
+constexpr uint8_t ICMP_REQ = 8;
+constexpr uint8_t ICMP_REPLY = 0; 
+
 struct FrameX
 {
 	uint8_t mac_dest[6];
@@ -18,11 +28,7 @@ struct ARP
 	uint8_t ip_dst[4];
 };
 
-constexpr uint8_t IP_ICMP= 1;
-constexpr uint8_t IP_TCP= 6;
-constexpr uint8_t IP_UDP=17;
-
-struct IP_pkt 
+struct IP 
 {
   uint8_t verlen; //protocol version and header length
   uint8_t ts; //service type
@@ -35,5 +41,14 @@ struct IP_pkt
   uint8_t ip_src[4]; //IP-SA
   uint8_t ip_dst[4]; //IP-DA
   uint8_t data[]; //data
+};
+
+struct ICMP
+{
+	uint8_t msg_type;
+	uint8_t msg_code;
+	uint16_t header_checksum;
+	uint16_t pack_id;
+	uint16_t pack_num;
 };
 
