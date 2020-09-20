@@ -27,6 +27,7 @@ struct ARP
 	uint8_t macaddr_dst[6];
 	uint8_t ip_dst[4];
 };
+
 struct IP 
 {
   uint8_t verlen; //protocol version and header length
@@ -55,3 +56,32 @@ struct UDP
 	uint16_t len;
 	uint16_t udp_checksum;
 };
+struct TCP 
+{
+  uint16_t port_src;
+  uint16_t port_dst;
+  uint32_t bt_num_seg;//byte num (pointer to first byte)
+  /*!<(first byte + quantity of bytes in segment + 1 or next byte num)>*/
+  uint32_t num_ask;//ack number 
+  uint8_t len_hdr;//(header length 0xF)*4 with 1 flag on last bit
+  uint8_t fl;//flags
+  uint16_t size_wnd;//windowsize
+  uint16_t cs;//checksum
+  uint16_t urg_ptr;//urgent data ptr
+}; 
+ //--------------------------------------------------
+
+//флаги TCP
+constexpr uint8_t TCP_CWR = 0x80;
+constexpr uint8_t TCP_ECE = 0x40;
+constexpr uint8_t TCP_URG = 0x20;
+constexpr uint8_t TCP_ACK = 0x10;
+constexpr uint8_t TCP_PSH = 0x08;
+constexpr uint8_t TCP_RST = 0x04;
+constexpr uint8_t TCP_SYN = 0x02;
+constexpr uint8_t TCP_FIN = 0x01;
+//--------------------------------------------------
+//операции TCP
+constexpr uint8_t TCP_OP_SYNACK = 1;
+constexpr uint8_t TCP_OP_ACK_OF_FIN = 2;
+constexpr uint8_t TCP_OP_ACK_OF_RST = 3;

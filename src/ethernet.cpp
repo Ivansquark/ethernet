@@ -163,7 +163,7 @@ void Eth::frame_read()
         ip_read();
     }
 }
-
+//------------------------------------------------------------------------
 void Eth::arp_read()
 {
     arp_receivePtr = (ARP*)(fRx+1);    
@@ -172,15 +172,15 @@ void Eth::arp_read()
        (fRx->mac_dest[2]==0xff || fRx->mac_dest[2]==mac[2]) &&
        (fRx->mac_dest[3]==0xff || fRx->mac_dest[3]==mac[3]) &&
        (fRx->mac_dest[4]==0xff || fRx->mac_dest[4]==mac[4]) &&
-       (fRx->mac_dest[5]==0xff || fRx->mac_dest[5]==mac[5]) && 
+       (fRx->mac_dest[5]==0xff || fRx->mac_dest[5]==mac[1]) && 
         arp_receivePtr->ip_dst[0]==ip[0] && arp_receivePtr->ip_dst[1]==ip[1] &&
         arp_receivePtr->ip_dst[2]==ip[2] && arp_receivePtr->ip_dst[3]==ip[3]) //recieve broadcast need to send back mac
     {
         for(uint8_t i=0;i<6;i++)
         {
-            mac_recieve[i] = fRx->mac_src[i];                
-            arp_receivePtr->macaddr_dst[i] = mac_recieve[i]; 
-            //fRx->mac_src[i] = mac_recieve[i];                
+            mac_receive[i] = fRx->mac_src[i];                
+            arp_receivePtr->macaddr_dst[i] = mac_receive[i]; 
+            //fRx->mac_src[i] = mac_receive[i];                
         }
         for(uint8_t i=0;i<4;i++)
         {ip_receive[i] = arp_receivePtr->ip_src[i];} //write incoming ip address of requesting PC
@@ -189,9 +189,10 @@ void Eth::arp_read()
     else if(fRx->mac_dest[0]==mac[0] && fRx->mac_dest[1]==mac[1] &&
             fRx->mac_dest[2]==mac[2] && fRx->mac_dest[3]==mac[3] &&
             fRx->mac_dest[4]==mac[4] && fRx->mac_dest[5]==mac[5]) //if answer (after send arp from micro) 
-    {
-        for(uint8_t i=0;i<6;i++)
-        {mac_recieve[i] = arp_receivePtr->macaddr_src[i];}                                    
+    { 
+        for(uint8_t i=0; i<6; i++)
+        { mac_receive[i] =  fRx->mac_dest[i];}
+        arp_answer();                       
     }      
 }
 void Eth::arp_send()
@@ -205,11 +206,10 @@ void Eth::arp_send()
     }
     transmit_frame(44);
 }
-
 void Eth::arp_answer() //TODO:
 {
     for(uint8_t i=0;i<6;i++)
-    {frameTx.mac_dest[i] = mac_recieve[i];}
+    {frameTx.mac_dest[i] = mac_receive[i];}
     arp_receivePtr = &arpInit;
     arp_receivePtr->op = swap16(0x0002);
     for(uint8_t i=0;i<6;i++)
@@ -217,7 +217,7 @@ void Eth::arp_answer() //TODO:
     for(uint8_t i=0;i<4;i++)
     {arp_receivePtr->ip_src[i] = ip[i];} // set source mac in ARP
     for(uint8_t i=0;i<6;i++)
-    {arp_receivePtr->macaddr_dst[i] = mac_recieve[i];} // set dest mac in ARP
+    {arp_receivePtr->macaddr_dst[i] = mac_receive[i];} // set dest mac in ARP
     for(uint8_t i=0;i<4;i++)
     {arp_receivePtr->ip_dst[i] = ip_receive[i];} // set dest ip in ARP answer
 
@@ -227,7 +227,7 @@ void Eth::arp_answer() //TODO:
     {TxBuf[i+sizeof(frameTx)] = *((uint8_t*)(arp_receivePtr)+i);}
     transmit_frame(44);
 }
-
+//------------------------------------------------------------------------
 void Eth::ip_read()
 {
     ip_receivePtr = (IP*)(fRx+1);
@@ -239,8 +239,13 @@ void Eth::ip_read()
     {
         udp_read();
     }
+    else if (ip_receivePtr->prt == IP_TCP)
+    {
+        tcp_read();
+    }
     //IPflag=true;    
 }
+//----------------------------------------------------------------------------
 void Eth::icmp_read()
 {
     uint16_t len = swap16(ip_receivePtr->len) - sizeof(IP) - sizeof(ICMP);
@@ -280,6 +285,33 @@ void Eth::icmp_read()
     else if(icmp_receivePtr->msg_type==ICMP_REPLY)
     {    }    
 }
+void Eth::icmp_write() //only after arp send
+{
+    FrameX* fTx = (FrameX*)TxBuf;
+    //for(uint8_t i=0;i<6;i++){fTx->mac_dest[i]=mac_receive[i];}
+    fTx->mac_dest[0]=0x20;fTx->mac_dest[1]=0x1a; fTx->mac_dest[2]=0x06;
+    fTx->mac_dest[3]=0x7f;fTx->mac_dest[4]=0xd6; fTx->mac_dest[5]=0xb6;    
+    for(uint8_t i=0;i<6;i++){fTx->mac_src[i]=mac[i];}
+    fTx->type = swap16(IPv4_i);
+    IP* ipPtr = (IP*)(fTx+1);
+    ipPtr->verlen = 0x45; ipPtr->ts=0;
+    ipPtr->len = swap16(sizeof(IP)+sizeof(ICMP)+1);
+    ipPtr->id = swap16(0x0001);
+    ipPtr->fl_frg_of = swap16(0x0000);
+    ipPtr->ttl = 64; ipPtr->prt = IP_ICMP;
+    for(uint8_t i=0;i<4;i++){ipPtr->ip_src[i] = ip[i];}
+    //for(uint8_t i=0;i<4;i++){ipPtr->ip_dst[i] = ip_receive[i];}
+    ipPtr->ip_dst[0] = 5;ipPtr->ip_dst[1] = 255;
+    ipPtr->ip_dst[2] = 255; ipPtr->ip_dst[3] = 50;
+    ICMP* icmpPtr = (ICMP*)(ipPtr+1);
+    icmpPtr->msg_type = ICMP_REQ; icmpPtr->msg_code=0;
+    icmpPtr->pack_id = swap16(0x0001);icmpPtr->pack_num = swap16(0x0001);
+    uint8_t* data = (uint8_t*)(icmpPtr+1);
+    data[0]=0xFF;
+    uint16_t len = sizeof(FrameX) + sizeof(IP)+sizeof(ICMP)+1;
+    transmit_frame(len);
+}
+//--------------------------------------------------------------------
 void Eth::udp_read()
 {
     udp_receivePtr = (UDP*)(ip_receivePtr+1);
@@ -288,7 +320,7 @@ void Eth::udp_read()
         udp_initReply();
         UDPflag = true;
         uint8_t arr[]="jopa";
-        udp_write(arr,5);
+        udp_writeReply(arr,5);
     }
 }
 void Eth::udp_initReply()
@@ -322,7 +354,7 @@ void Eth::udp_initReply()
     for(uint8_t i=0; i<(swap16(UDP_received.len)-sizeof(UDP)); i++)
     {*((uint8_t*)((UDP*)&UDP_data)+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)];}
 }
-void Eth::udp_write(uint8_t* data,uint16_t len)
+void Eth::udp_writeReply(uint8_t* data,uint16_t len)
 {
     uint16_t ip_len = sizeof(IP) + sizeof(UDP) + len;
     uint16_t udp_len = sizeof(UDP) + len;
@@ -338,6 +370,92 @@ void Eth::udp_write(uint8_t* data,uint16_t len)
     for (uint8_t i=0;i<len;i++)
     {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)] = *((uint8_t*)(data)+i);}
     transmit_frame(length);    
+}
+void Eth::udp_write(uint8_t* data,uint16_t len, uint16_t port)
+{
+    uint16_t ip_len = sizeof(IP) + sizeof(UDP) + len;
+    uint16_t udp_len = sizeof(UDP) + len;
+    uint16_t length = sizeof(FrameX)+sizeof(IP)+sizeof(UDP)+len; 
+    IP_received.len = swap16(ip_len); 
+    UDP_received.len = swap16(udp_len);
+    //for (uint8_t i=0;i<sizeof(FrameX);i++)
+    //{TxBuf[i] = *((uint8_t*)(&frameRx)+i);}
+    //for (uint8_t i=0;i<sizeof(IP);i++)
+    //{TxBuf[i+sizeof(FrameX)] = *((uint8_t*)(&IP_received)+i);}        
+    //for (uint8_t i=0;i<sizeof(UDP);i++)
+    //{TxBuf[i+sizeof(FrameX)+sizeof(IP)] = *((uint8_t*)(&UDP_received)+i);}
+    //for (uint8_t i=0;i<len;i++)
+    //{TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)] = *((uint8_t*)(data)+i);}
+    transmit_frame(length);    
+}
+//----------------------------------------------------------------------------------
+void Eth::tcp_read()
+{
+    tcp_receivePtr = (TCP*)(ip_receivePtr+1);
+    if((tcp_receivePtr->fl)==(TCP_SYN)) //if ACK and SYN 
+    {
+        tcp_initReply();
+        tcp_reply();
+    }    
+}
+void Eth::tcp_initReply()
+{
+    /*!< save received frame information for deferred reply >*/
+    for(uint8_t i=0; i<sizeof(FrameX); i++)
+    {*((uint8_t*)&frameRx+i) = RxBuf[i];}
+    /*! need to exchange mac SA and DA*/
+    for(uint8_t i=0;i<6;i++)
+    {
+        frameRx.mac_dest[i]=frameRx.mac_src[i];
+        frameRx.mac_src[i] = mac[i];
+    }
+    /*!< save received IP information for deferred reply >*/
+    for(uint8_t i=0; i<sizeof(IP); i++)
+    {*((uint8_t*)&IP_received+i) = RxBuf[i+sizeof(FrameX)];}
+    /*!< need to exchange ip SA and DA>*/
+    for(uint8_t i=0;i<4;i++)
+    {
+        IP_received.ip_dst[i] = IP_received.ip_src[i];
+        IP_received.ip_src[i] = ip[i];
+    }
+    IP_received.len = swap16(swap16(ip_receivePtr->len)+4);//new IP length
+    /*!< save received TCP information for deferred reply >*/
+    uint8_t tcp_header_len = (tcp_receivePtr->len_hdr>>4)<<2; // multiply by four    
+    for(uint8_t i=0; i<tcp_header_len; i++)
+    {*((uint8_t*)&TCP_received+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)];}
+    /*!< need to exchange TCP ports >*/
+    uint16_t bufPort = TCP_received.port_src;
+    TCP_received.port_src = TCP_received.port_dst;
+    TCP_received.port_dst = bufPort;
+    /*!< need to change bytes numbers in TCP header >*/
+    uint32_t num_askR = swap32(tcp_receivePtr->bt_num_seg)+1;
+    uint32_t bt_num_segR = swap32(tcp_receivePtr->fl); //rand
+    TCP_received.num_ask = swap32(num_askR);
+    TCP_received.bt_num_seg = swap32(bt_num_segR);
+    TCP_received.fl = TCP_SYN | TCP_ACK;
+    TCP_received.size_wnd = swap16(8192);
+    TCP_received.len_hdr = ((tcp_header_len + 4)>>2)<<4; //divide on four  and shift on two
+    /*!< save received TCP data information for deferred reply >*/    
+    for(uint8_t i=0; i<(swap16(IP_received.len)-sizeof(IP) - tcp_header_len); i++)
+    {*((uint8_t*)&TCP_data+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+tcp_header_len];}
+    /*!< + options >*/
+    TCP_data[0]=2;//Maximum Segment Size (2)    
+    TCP_data[1]=4;//Length
+    TCP_data[2]=0x05;
+    TCP_data[3]=0x82; 
+}
+void Eth::tcp_reply()
+{
+    uint16_t len = sizeof(FrameX) + swap16(IP_received.len);
+    for (uint8_t i=0;i<sizeof(FrameX);i++)
+    {TxBuf[i] = *((uint8_t*)(&frameRx)+i);}
+    for (uint8_t i=0;i<sizeof(IP);i++)
+    {TxBuf[i+sizeof(FrameX)] = *((uint8_t*)(&IP_received)+i);}        
+    for (uint8_t i=0;i<sizeof(TCP);i++)
+    {TxBuf[i+sizeof(FrameX)+sizeof(IP)] = *((uint8_t*)(&TCP_received)+i);}
+    for (uint8_t i=0;i<4;i++)
+    {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(TCP)] = *((uint8_t*)(&TCP_data)+i);}
+    transmit_frame(len);
 }
 
 //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

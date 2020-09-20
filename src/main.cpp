@@ -26,8 +26,9 @@ int main()
     for(uint32_t i=0;i<50000000;i++);
     eth.frame_read();
     for(uint8_t i=0;i<6;i++)
-    {uart.sendByte(eth.mac_recieve[i]);eth.mac_recieve[i]=0;}  
+    {uart.sendByte(eth.mac_receive[i]);/*eth.mac_receive[i]=0;*/}  
     eth.ReceiveFlag=false;
+    eth.icmp_write();
     while(1)
     {
         //eth.arp_send();
