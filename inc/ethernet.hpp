@@ -15,7 +15,9 @@ public:
 	UDP UDP_received{0};	 
 	uint8_t UDP_data[200];// for deferred reply
 	TCP TCP_received{0};
-	uint8_t TCP_data[1500-sizeof(IP)];
+	uint8_t TCP_data_transmit[1500-sizeof(IP)];
+	uint8_t TCP_data_receive[0x2000]; //8192 on stack (window buffer)
+	uint16_t TCP_received_data_len{0}; //size of received data in segment
 	//-----------------------------------------------
 	FrameX* fRx{nullptr};
 	ARP* arp_receivePtr{nullptr};
@@ -44,7 +46,7 @@ public:
 //-------------------- TCP ----------------------------------
 	void tcp_read();
 	void tcp_initReply(uint8_t flags, uint16_t TCP_data_len);
-	void tcp_reply();
+	void tcp_reply(uint16_t TCP_data_len,bool reply);
 //---------------------------------------------------------
     void receive_frame(); //depricated
 	void transmit_frame(uint16_t size); 

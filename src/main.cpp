@@ -55,8 +55,26 @@ int main()
             Eth::pThis->ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
             //uart.sendStr("opa");            
         }
-        else {
-             
+        else {}
+        if(eth.TCP_received_data_len)
+        {
+            for(uint8_t i=0; i<eth.TCP_received_data_len; i++)
+            {
+                uart.sendByte(eth.TCP_data_receive[i]);
+            }
+            if(eth.TCP_data_receive[0] == 'o' &&
+               eth.TCP_data_receive[1] == 'p' &&
+               eth.TCP_data_receive[2] == 'a') 
+            {
+                eth.TCP_data_transmit[0] = 'j';
+                eth.TCP_data_transmit[1] = 'o';
+                eth.TCP_data_transmit[2] = 'p';
+                eth.TCP_data_transmit[3] = 'a';
+                eth.TCP_data_transmit[4] = '\n';
+                //eth.tcp_initReply(TCP_ACK,4);        
+                eth.tcp_reply(5,false);
+            }
+            eth.TCP_received_data_len=0;
         }
 
             

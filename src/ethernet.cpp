@@ -368,18 +368,26 @@ void Eth::udp_write(uint8_t* data,uint16_t len, uint16_t port) {
     //{TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)] = *((uint8_t*)(data)+i);}
     transmit_frame(length);    
 }
-//----------------------------------------------------------------------------------
+
+
+
+//------------------*****************----------------------------------------------------
+//---------------------*** TCP ***-------------------------------------------------------
+//---------------------***********-------------------------------------------------------
 void Eth::tcp_read() {
     tcp_receivePtr = (TCP*)(ip_receivePtr+1);
+    //uint8_t TCP_header_len = ((tcp_receivePtr->len_hdr)>>4)<<2;//shift on 4 and multiply by 4
+    //uint16_t recived_TCP_data_len = swap16(ip_receivePtr->len) - sizeof(IP) - TCP_header_len;
+
     if((tcp_receivePtr->fl)==(TCP_SYN)) { //if start connection 
-        tcp_initReply(TCP_SYN | TCP_ACK);
-        tcp_reply();
+        tcp_initReply((TCP_SYN | TCP_ACK),0);
+        tcp_reply(0,true);
     }  
     else if (tcp_receivePtr->fl==(TCP_FIN|TCP_ACK)) { //if starts disconnection from remote host
-        tcp_initReply(TCP_ACK);
-        tcp_reply();
-        tcp_initReply(TCP_FIN|TCP_ACK);
-        tcp_reply();
+        tcp_initReply(TCP_ACK,0);
+        tcp_reply(0,true);
+        tcp_initReply(TCP_FIN|TCP_ACK,0);
+        tcp_reply(0,true);
     }  
     else if (tcp_receivePtr->fl==(TCP_ACK)) { // if got acknowledgement packet
         //TODO: send usfull data with TCP_ACK 
@@ -388,8 +396,8 @@ void Eth::tcp_read() {
         //nothing here
     }
     else if (tcp_receivePtr->fl==(TCP_PSH | TCP_ACK)) { // if remote host require to handling all data now and send ACK
-        tcp_initReply(TCP_ACK);
-        tcp_reply();
+        tcp_initReply(TCP_ACK,0);        
+        tcp_reply(0,true);
     }
 }
 void Eth::tcp_initReply(uint8_t flags, uint16_t TCP_data_len) {
@@ -411,18 +419,20 @@ void Eth::tcp_initReply(uint8_t flags, uint16_t TCP_data_len) {
         IP_received.ip_dst[i] = IP_received.ip_src[i];
         IP_received.ip_src[i] = ip[i];
     }
-    if(flags == TCP_SYN | TCP_ACK) { // if connection flags
-        IP_received.len = swap16(swap16(ip_receivePtr->len)+4);//new IP length
+    if(flags == (TCP_SYN | TCP_ACK) ) { // if connection flags
+        //IP_received.len = swap16(swap16(ip_receivePtr->len)+4);//new IP length
+        IP_received.len = swap16(sizeof(IP)+sizeof(TCP)+4);
     } else {
         if(TCP_data_len) { // if need to insert data
-            IP_received.len = swap16(sizeof(FrameX)+sizeof(IP)+sizeof(TCP)+TCP_data_len);
+            IP_received.len = swap16(sizeof(IP)+sizeof(TCP)+TCP_data_len);
         } else { //if no data (ACK reply)
-            IP_received.len = swap16(swap16(ip_receivePtr->len));
+            IP_received.len = swap16(sizeof(IP)+sizeof(TCP)); //ACK reply len
         }        
     }
 //------------------------------------------------------------------------------------------------------------
         /*!< save received TCP information for deferred reply >*/
     uint8_t tcp_header_len = (tcp_receivePtr->len_hdr>>4)<<2; // multiply by four //TODO: if receive header with options?need to examinate it first of all   
+    TCP_received_data_len = swap16(ip_receivePtr->len)-sizeof(IP) - tcp_header_len;//segment len
     for(uint8_t i=0; i<tcp_header_len; i++)
     {*((uint8_t*)&TCP_received+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)];}
     /*!< need to exchange TCP ports >*/
@@ -433,20 +443,20 @@ void Eth::tcp_initReply(uint8_t flags, uint16_t TCP_data_len) {
     /*!< need to change bytes numbers in TCP header >*/
     uint32_t num_ackR;
     uint32_t num_seqR;
-    if(flags == TCP_SYN | TCP_ACK){
-        num_ackR = swap32(tcp_receivePtr->num_seq); //write sequence num in ack num adding one (in SYN)
-        num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
-    } else if (flags == TCP_FIN | TCP_ACK) {
+    if(flags == (TCP_SYN | TCP_ACK) ){
+        num_ackR = swap32(tcp_receivePtr->num_seq) +1; //write sequence num in ack num adding one (in SYN)
+        num_seqR = swap32(tcp_receivePtr->cs); //RAND (associated with working system time not nescessary in mc)
+    } else if (flags == (TCP_FIN | TCP_ACK)) {
         num_ackR = swap32(tcp_receivePtr->num_seq); //write sequence num in ack num adding none (in FIN|ACK)
-        num_seqR = swap32(tcp_receivePtr->fl); //rand (associated with working system time not nescessary in mc)
-    } else if(flags == TCP_PSH | TCP_ACK) { // if received data and need to send data with ACK or just ACK
-
+        num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
+    } else if(flags == (TCP_PSH | TCP_ACK) ) { // if need to push data on remote host
+        ////////////
     } else if(flags == TCP_ACK) { // if received data or reply for FIN|ACK 
-        if(tcp_receivePtr->num_seq->fl == FIN|ACK) {
+        if(tcp_receivePtr->fl == (TCP_FIN|TCP_ACK) ) { //for client
             num_ackR = swap32(tcp_receivePtr->num_seq)+1; //write sequence num in ack num adding 1 (if FIN|ACK)
             num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
         } else {
-            num_ackR = swap32(tcp_receivePtr->num_seq) + TCP_data_len; //write sequence num in ack num adding data bytes if exists
+            num_ackR = swap32(tcp_receivePtr->num_seq) + TCP_received_data_len; //write sequence num in ack num adding data bytes if exists
             num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
         }
     }    
@@ -454,32 +464,51 @@ void Eth::tcp_initReply(uint8_t flags, uint16_t TCP_data_len) {
     TCP_received.num_seq = swap32(num_seqR); //in reply it will added by number of bytes
     TCP_received.fl = flags; // reply on SYN request
     TCP_received.size_wnd = swap16(8192); //window size (will decrease by each packet)
-    /*! increasing for 4 bytes to send options*/
-    if(flags == TCP_SYN | TCP_ACK) {
-        TCP_received.len_hdr = ((tcp_header_len + 4)>>2)<<4; //divide on four  and shift on two
-    } else { // header not include options
-        //TCP_received.len_hdr = ((tcp_header_len)>>2)<<4;
+//-------------------------------------------------------------------------------------------------
+    /*!< save received TCP data information for deferred reply >*/     
+    for(uint8_t i=0; i<TCP_received_data_len; i++) {
+        TCP_data_receive[i] = RxBuf[i+sizeof(FrameX)+sizeof(IP)+tcp_header_len];
+        //*((uint8_t*)&TCP_data_transmit+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+tcp_header_len];
     }
-    
-    /*!< save received TCP data information for deferred reply >*/    
-    for(uint8_t i=0; i<(swap16(IP_received.len)-sizeof(IP) - tcp_header_len); i++)
-    {*((uint8_t*)&TCP_data+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+tcp_header_len];} 
-    /*!< + options >*/ //if no options this data will not sending becouse header length is not incude this data
-    TCP_data[0]=2;//Maximum Segment Size (2)    
-    TCP_data[1]=4;//Length
-    TCP_data[2]=0x05;
-    TCP_data[3]=0x82; 
+//------------------------------------------------------------------------
+    /*!<--------------(NOT) sliding window ------------------->*/
+    //TODO: study out sliding window and overflowing
+    if((tcp_receivePtr->fl == (TCP_PSH | TCP_ACK)) || (swap16(tcp_receivePtr->size_wnd)<1410)) {
+        tcp_receivePtr->size_wnd = swap16(0x2000);
+    } else {
+        tcp_receivePtr->size_wnd = swap16(swap16(tcp_receivePtr->size_wnd) - TCP_received_data_len);
+    }      
+//------------------------------------------------------------------------------------------------
+/*!< + options >*/ //if no options this data will not sending becouse header length is not incude this data
+    if(tcp_receivePtr->fl==(TCP_SYN)) {
+        /*! <increasing for 4 bytes to send options> only in connection!!! */
+        TCP_received.len_hdr = ((sizeof(TCP) + 4)>>2)<<4; //new header length + 4 bytes
+        TCP_data_transmit[0]=2;//Maximum Segment Size (2)    
+        TCP_data_transmit[1]=4;//Length
+        TCP_data_transmit[2]=0x05;
+        TCP_data_transmit[3]=0x82; //0x0582 = 1410 - size of segment
+    }
+     
 }
-void Eth::tcp_reply() {
-    uint16_t len = sizeof(FrameX) + swap16(IP_received.len);
+void Eth::tcp_reply(uint16_t TCP_data_len, bool reply) {
+    uint8_t TCP_header_len = (TCP_received.len_hdr>>4)<<2;
+    uint16_t len = sizeof(FrameX) + sizeof(IP) + TCP_header_len + TCP_data_len;
+    if(!reply) { //if not reply than just transmit
+        IP_received.len = swap16(swap16(IP_received.len)+TCP_data_len);
+    }    
     for (uint8_t i=0;i<sizeof(FrameX);i++)
     {TxBuf[i] = *((uint8_t*)(&frameRx)+i);}
     for (uint8_t i=0;i<sizeof(IP);i++)
     {TxBuf[i+sizeof(FrameX)] = *((uint8_t*)(&IP_received)+i);}        
     for (uint8_t i=0;i<sizeof(TCP);i++)
     {TxBuf[i+sizeof(FrameX)+sizeof(IP)] = *((uint8_t*)(&TCP_received)+i);}
-    for (uint8_t i=0;i<4;i++)
-    {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(TCP)] = *((uint8_t*)(&TCP_data)+i);}
+    if(!reply) {
+        for (uint8_t i=0;i<TCP_data_len;i++)
+        {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(TCP)] = *((uint8_t*)(&TCP_data_transmit)+i);}
+    } else {
+        for (uint8_t i=0;i<4;i++)
+        {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(TCP)] = *((uint8_t*)(&TCP_data_transmit)+i);}
+    }
     transmit_frame(len);
 }
 

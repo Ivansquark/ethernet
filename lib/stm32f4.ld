@@ -1,6 +1,6 @@
 
 _Min_Heap_Size = 0x4000;	/*32K*/
-_Min_Stack_Size = 0x2000;  /*16K*/
+_Min_Stack_Size = 0x4000;  /*16K*/
 
 /*stack will be at the begining of RAM => _estack = 0x2000000 + 0x00001000 => _estack = 0x20001000*/
 
