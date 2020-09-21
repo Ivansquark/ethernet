@@ -55,8 +55,7 @@ int main()
             Eth::pThis->ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA
             //uart.sendStr("opa");            
         }
-        else
-        {
+        else {
              
         }
 

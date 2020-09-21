@@ -9,14 +9,12 @@ constexpr uint8_t IP_UDP=17;
 constexpr uint8_t ICMP_REQ = 8;
 constexpr uint8_t ICMP_REPLY = 0; 
 //-------------------------------------------
-struct FrameX
-{
+struct FrameX {
 	uint8_t mac_dest[6];
 	uint8_t mac_src[6];
 	uint16_t type;
 };
-struct ARP
-{
+struct ARP {
 	uint16_t net;
 	uint16_t protocol;
 	uint8_t mac_len;
@@ -28,8 +26,7 @@ struct ARP
 	uint8_t ip_dst[4];
 };
 
-struct IP 
-{
+struct IP {
   uint8_t verlen; //protocol version and header length
   uint8_t ts; //service type
   uint16_t len; //length
@@ -41,28 +38,25 @@ struct IP
   uint8_t ip_src[4]; //IP-SA
   uint8_t ip_dst[4]; //IP-DA  
 };
-struct ICMP
-{
+struct ICMP {
 	uint8_t msg_type;
 	uint8_t msg_code;
 	uint16_t header_checksum;
 	uint16_t pack_id;
 	uint16_t pack_num;
 };
-struct UDP
-{
+struct UDP {
 	uint16_t port_src;
 	uint16_t port_dst;
 	uint16_t len;
 	uint16_t udp_checksum;
 };
-struct TCP 
-{
+struct TCP {
   uint16_t port_src;
   uint16_t port_dst;
-  uint32_t bt_num_seg;//byte num (pointer to first byte)
+  uint32_t num_seq;//byte num (pointer to first byte)
   /*!<(first byte + quantity of bytes in segment + 1 or next byte num)>*/
-  uint32_t num_ask;//ack number 
+  uint32_t num_ack;//ack number 
   uint8_t len_hdr;//(header length 0xF)*4 with 1 flag on last bit
   uint8_t fl;//flags
   uint16_t size_wnd;//windowsize
@@ -71,7 +65,7 @@ struct TCP
 }; 
  //--------------------------------------------------
 
-//флаги TCP
+//TCP flags
 constexpr uint8_t TCP_CWR = 0x80;
 constexpr uint8_t TCP_ECE = 0x40;
 constexpr uint8_t TCP_URG = 0x20;
@@ -81,7 +75,7 @@ constexpr uint8_t TCP_RST = 0x04;
 constexpr uint8_t TCP_SYN = 0x02;
 constexpr uint8_t TCP_FIN = 0x01;
 //--------------------------------------------------
-//операции TCP
+//TCP operations
 constexpr uint8_t TCP_OP_SYNACK = 1;
 constexpr uint8_t TCP_OP_ACK_OF_FIN = 2;
 constexpr uint8_t TCP_OP_ACK_OF_RST = 3;

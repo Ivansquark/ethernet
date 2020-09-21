@@ -5,8 +5,7 @@ uint32_t Eth::TransmitDL[4]={0}; //static for creating not in stack
 
 Eth* Eth::pThis = nullptr;
 
-Eth::Eth(uint8_t* rxB,uint8_t* txB)
-{
+Eth::Eth(uint8_t* rxB,uint8_t* txB) {
     for(uint8_t i=0; i<6;i++)
     {frameTx.mac_dest[i] = mac_broadcast[i];}
     for(uint8_t i=0; i<6;i++)
@@ -19,8 +18,7 @@ Eth::Eth(uint8_t* rxB,uint8_t* txB)
     descr_init();
 }
 
-void Eth::eth_init()
-{
+void Eth::eth_init() {
     /*GPIOs RCC*/
     RCC->AHB1ENR|=(RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN);
     /*!< PA1-ETH_RMII_REF_CLK  PA2-ETH_MDIO SMI PA7-ETH_RMII_CRS_DV >*/    
@@ -92,8 +90,7 @@ void Eth::eth_init()
     NVIC_EnableIRQ(ETH_IRQn);
 }
 //--------------------------------------- SMI methods ----------------------------------------
-uint8_t Eth::smi_read(uint8_t reg_num)
-{
+uint8_t Eth::smi_read(uint8_t reg_num) {
     uint16_t x=0;
     ETH->MACMIIAR&=~ETH_MACMIIAR_MW;//read ready    
     ETH->MACMIIAR|=(reg_num&0x1F)<<6; //write number of PHY register in reg
@@ -105,8 +102,7 @@ uint8_t Eth::smi_read(uint8_t reg_num)
     }
     return x>>8;
 }
-void Eth::smi_write(uint8_t reg_num, uint8_t val)
-{
+void Eth::smi_write(uint8_t reg_num, uint8_t val) {
     ETH->MACMIIAR|=ETH_MACMIIAR_MW;//write ready
     ETH->MACMIIAR|=(reg_num&0x1F)<<6; //write number of PHY register in reg 
     ETH->MACMIIAR|=ETH_MACMIIAR_MB;//to start
@@ -114,8 +110,7 @@ void Eth::smi_write(uint8_t reg_num, uint8_t val)
     while(ETH->MACMIIAR & ETH_MACMIIAR_MB);    
 }
 //--------------------------------------------------------------------------------------------------------
-void Eth::descr_init()
-{
+void Eth::descr_init() {
 	ReceiveDL[3] = (uint32_t)ReceiveDL; //sets address of new descriptor (its the same)
 	TransmitDL[3] = (uint32_t)TransmitDL; //sets address of new descriptor (its the same)
 	ReceiveDL[2] = (uint32_t)RxBuf; //sets address of new descriptor (its the same)
@@ -137,22 +132,17 @@ void Eth::descr_init()
     ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA    
 }
 //-----------------------------------------------------------------------------------------------------------
-void Eth::receive_frame()
-{	
+void Eth::receive_frame() {	
 	//ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA	
 }
-void Eth::transmit_frame(uint16_t size)
-{
+void Eth::transmit_frame(uint16_t size) {
     TransmitDL[1] = (size); //size of Tx first buffer
 	TransmitDL[0] |= (1<<31); //sets OWN bit to DMA
     ETH->DMAOMR |= ETH_DMAOMR_ST; //start transmittion (starts DMA polling)	
-	//need timer
-    //for(uint32_t i=0;i<100;i++);
 	ETH->DMAOMR &=~ ETH_DMAOMR_ST; //(ends DMA polling)
 }
 //--------------------------------------------------------------
-void Eth::frame_read()
-{
+void Eth::frame_read() {
     fRx = (FrameX*)RxBuf;
     if(fRx->type == swap16(ARP_i)) //ARP packet
     {
@@ -164,8 +154,7 @@ void Eth::frame_read()
     }
 }
 //------------------------------------------------------------------------
-void Eth::arp_read()
-{
+void Eth::arp_read() {
     arp_receivePtr = (ARP*)(fRx+1);    
     if((fRx->mac_dest[0]==0xff || fRx->mac_dest[0]==mac[0]) && 
        (fRx->mac_dest[1]==0xff || fRx->mac_dest[1]==mac[1]) &&
@@ -195,8 +184,7 @@ void Eth::arp_read()
         arp_answer();                       
     }      
 }
-void Eth::arp_send()
-{
+void Eth::arp_send() {
     FrameX arpTx = {0xff,0xff,0xff,0xff,0xff,0xff,0x32,0x12,0x56,0x78,0x9a,0xbc,swap16(0x0806)};    
     for(uint8_t i=0; i<sizeof(arpTx);i++)
     {TxBuf[i] = *((uint8_t*)(&arpTx)+i);}
@@ -206,8 +194,7 @@ void Eth::arp_send()
     }
     transmit_frame(44);
 }
-void Eth::arp_answer() //TODO:
-{
+void Eth::arp_answer() {
     for(uint8_t i=0;i<6;i++)
     {frameTx.mac_dest[i] = mac_receive[i];}
     arp_receivePtr = &arpInit;
@@ -228,8 +215,7 @@ void Eth::arp_answer() //TODO:
     transmit_frame(44);
 }
 //------------------------------------------------------------------------
-void Eth::ip_read()
-{
+void Eth::ip_read() {
     ip_receivePtr = (IP*)(fRx+1);
     if(ip_receivePtr->prt == IP_ICMP)
     {
@@ -246,8 +232,7 @@ void Eth::ip_read()
     //IPflag=true;    
 }
 //----------------------------------------------------------------------------
-void Eth::icmp_read()
-{
+void Eth::icmp_read() {
     uint16_t len = swap16(ip_receivePtr->len) - sizeof(IP) - sizeof(ICMP);
     uint16_t total_len = sizeof(FrameX) + swap16(ip_receivePtr->len);
     icmp_receivePtr = (ICMP*)(ip_receivePtr+1);
@@ -285,8 +270,7 @@ void Eth::icmp_read()
     else if(icmp_receivePtr->msg_type==ICMP_REPLY)
     {    }    
 }
-void Eth::icmp_write() //only after arp send
-{
+void Eth::icmp_write() {
     FrameX* fTx = (FrameX*)TxBuf;
     //for(uint8_t i=0;i<6;i++){fTx->mac_dest[i]=mac_receive[i];}
     fTx->mac_dest[0]=0x20;fTx->mac_dest[1]=0x1a; fTx->mac_dest[2]=0x06;
@@ -312,8 +296,7 @@ void Eth::icmp_write() //only after arp send
     transmit_frame(len);
 }
 //--------------------------------------------------------------------
-void Eth::udp_read()
-{
+void Eth::udp_read() {
     udp_receivePtr = (UDP*)(ip_receivePtr+1);
     if(udp_receivePtr->port_dst == swap16(udp_port))
     {
@@ -323,8 +306,7 @@ void Eth::udp_read()
         udp_writeReply(arr,5);
     }
 }
-void Eth::udp_initReply()
-{
+void Eth::udp_initReply() {
     /*!< save received frame information for deferred reply >*/
     for(uint8_t i=0; i<sizeof(FrameX); i++)
     {*((uint8_t*)&frameRx+i) = RxBuf[i];}
@@ -354,8 +336,7 @@ void Eth::udp_initReply()
     for(uint8_t i=0; i<(swap16(UDP_received.len)-sizeof(UDP)); i++)
     {*((uint8_t*)((UDP*)&UDP_data)+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)];}
 }
-void Eth::udp_writeReply(uint8_t* data,uint16_t len)
-{
+void Eth::udp_writeReply(uint8_t* data,uint16_t len) {
     uint16_t ip_len = sizeof(IP) + sizeof(UDP) + len;
     uint16_t udp_len = sizeof(UDP) + len;
     uint16_t length = sizeof(FrameX)+sizeof(IP)+sizeof(UDP)+len; 
@@ -371,8 +352,7 @@ void Eth::udp_writeReply(uint8_t* data,uint16_t len)
     {TxBuf[i+sizeof(FrameX)+sizeof(IP)+sizeof(UDP)] = *((uint8_t*)(data)+i);}
     transmit_frame(length);    
 }
-void Eth::udp_write(uint8_t* data,uint16_t len, uint16_t port)
-{
+void Eth::udp_write(uint8_t* data,uint16_t len, uint16_t port) {
     uint16_t ip_len = sizeof(IP) + sizeof(UDP) + len;
     uint16_t udp_len = sizeof(UDP) + len;
     uint16_t length = sizeof(FrameX)+sizeof(IP)+sizeof(UDP)+len; 
@@ -389,17 +369,30 @@ void Eth::udp_write(uint8_t* data,uint16_t len, uint16_t port)
     transmit_frame(length);    
 }
 //----------------------------------------------------------------------------------
-void Eth::tcp_read()
-{
+void Eth::tcp_read() {
     tcp_receivePtr = (TCP*)(ip_receivePtr+1);
-    if((tcp_receivePtr->fl)==(TCP_SYN)) //if ACK and SYN 
-    {
-        tcp_initReply();
+    if((tcp_receivePtr->fl)==(TCP_SYN)) { //if start connection 
+        tcp_initReply(TCP_SYN | TCP_ACK);
         tcp_reply();
-    }    
+    }  
+    else if (tcp_receivePtr->fl==(TCP_FIN|TCP_ACK)) { //if starts disconnection from remote host
+        tcp_initReply(TCP_ACK);
+        tcp_reply();
+        tcp_initReply(TCP_FIN|TCP_ACK);
+        tcp_reply();
+    }  
+    else if (tcp_receivePtr->fl==(TCP_ACK)) { // if got acknowledgement packet
+        //TODO: send usfull data with TCP_ACK 
+    }
+    else if (tcp_receivePtr->fl==(TCP_RST)) { // if reset from remote host
+        //nothing here
+    }
+    else if (tcp_receivePtr->fl==(TCP_PSH | TCP_ACK)) { // if remote host require to handling all data now and send ACK
+        tcp_initReply(TCP_ACK);
+        tcp_reply();
+    }
 }
-void Eth::tcp_initReply()
-{
+void Eth::tcp_initReply(uint8_t flags, uint16_t TCP_data_len) {
     /*!< save received frame information for deferred reply >*/
     for(uint8_t i=0; i<sizeof(FrameX); i++)
     {*((uint8_t*)&frameRx+i) = RxBuf[i];}
@@ -408,44 +401,76 @@ void Eth::tcp_initReply()
     {
         frameRx.mac_dest[i]=frameRx.mac_src[i];
         frameRx.mac_src[i] = mac[i];
-    }
+    }    
+//-----------------------------------------------------------------------------
     /*!< save received IP information for deferred reply >*/
     for(uint8_t i=0; i<sizeof(IP); i++)
     {*((uint8_t*)&IP_received+i) = RxBuf[i+sizeof(FrameX)];}
     /*!< need to exchange ip SA and DA>*/
-    for(uint8_t i=0;i<4;i++)
-    {
+    for(uint8_t i=0;i<4;i++) {
         IP_received.ip_dst[i] = IP_received.ip_src[i];
         IP_received.ip_src[i] = ip[i];
     }
-    IP_received.len = swap16(swap16(ip_receivePtr->len)+4);//new IP length
-    /*!< save received TCP information for deferred reply >*/
-    uint8_t tcp_header_len = (tcp_receivePtr->len_hdr>>4)<<2; // multiply by four    
+    if(flags == TCP_SYN | TCP_ACK) { // if connection flags
+        IP_received.len = swap16(swap16(ip_receivePtr->len)+4);//new IP length
+    } else {
+        if(TCP_data_len) { // if need to insert data
+            IP_received.len = swap16(sizeof(FrameX)+sizeof(IP)+sizeof(TCP)+TCP_data_len);
+        } else { //if no data (ACK reply)
+            IP_received.len = swap16(swap16(ip_receivePtr->len));
+        }        
+    }
+//------------------------------------------------------------------------------------------------------------
+        /*!< save received TCP information for deferred reply >*/
+    uint8_t tcp_header_len = (tcp_receivePtr->len_hdr>>4)<<2; // multiply by four //TODO: if receive header with options?need to examinate it first of all   
     for(uint8_t i=0; i<tcp_header_len; i++)
     {*((uint8_t*)&TCP_received+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)];}
     /*!< need to exchange TCP ports >*/
     uint16_t bufPort = TCP_received.port_src;
     TCP_received.port_src = TCP_received.port_dst;
     TCP_received.port_dst = bufPort;
+//-------------------------------------------------------------------------------------------------------------------------
     /*!< need to change bytes numbers in TCP header >*/
-    uint32_t num_askR = swap32(tcp_receivePtr->bt_num_seg)+1;
-    uint32_t bt_num_segR = swap32(tcp_receivePtr->fl); //rand
-    TCP_received.num_ask = swap32(num_askR);
-    TCP_received.bt_num_seg = swap32(bt_num_segR);
-    TCP_received.fl = TCP_SYN | TCP_ACK;
-    TCP_received.size_wnd = swap16(8192);
-    TCP_received.len_hdr = ((tcp_header_len + 4)>>2)<<4; //divide on four  and shift on two
+    uint32_t num_ackR;
+    uint32_t num_seqR;
+    if(flags == TCP_SYN | TCP_ACK){
+        num_ackR = swap32(tcp_receivePtr->num_seq); //write sequence num in ack num adding one (in SYN)
+        num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
+    } else if (flags == TCP_FIN | TCP_ACK) {
+        num_ackR = swap32(tcp_receivePtr->num_seq); //write sequence num in ack num adding none (in FIN|ACK)
+        num_seqR = swap32(tcp_receivePtr->fl); //rand (associated with working system time not nescessary in mc)
+    } else if(flags == TCP_PSH | TCP_ACK) { // if received data and need to send data with ACK or just ACK
+
+    } else if(flags == TCP_ACK) { // if received data or reply for FIN|ACK 
+        if(tcp_receivePtr->num_seq->fl == FIN|ACK) {
+            num_ackR = swap32(tcp_receivePtr->num_seq)+1; //write sequence num in ack num adding 1 (if FIN|ACK)
+            num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
+        } else {
+            num_ackR = swap32(tcp_receivePtr->num_seq) + TCP_data_len; //write sequence num in ack num adding data bytes if exists
+            num_seqR = swap32(tcp_receivePtr->num_ack); //rand (associated with working system time not nescessary in mc)
+        }
+    }    
+    TCP_received.num_ack = swap32(num_ackR);
+    TCP_received.num_seq = swap32(num_seqR); //in reply it will added by number of bytes
+    TCP_received.fl = flags; // reply on SYN request
+    TCP_received.size_wnd = swap16(8192); //window size (will decrease by each packet)
+    /*! increasing for 4 bytes to send options*/
+    if(flags == TCP_SYN | TCP_ACK) {
+        TCP_received.len_hdr = ((tcp_header_len + 4)>>2)<<4; //divide on four  and shift on two
+    } else { // header not include options
+        //TCP_received.len_hdr = ((tcp_header_len)>>2)<<4;
+    }
+    
     /*!< save received TCP data information for deferred reply >*/    
     for(uint8_t i=0; i<(swap16(IP_received.len)-sizeof(IP) - tcp_header_len); i++)
-    {*((uint8_t*)&TCP_data+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+tcp_header_len];}
-    /*!< + options >*/
+    {*((uint8_t*)&TCP_data+i) = RxBuf[i+sizeof(FrameX)+sizeof(IP)+tcp_header_len];} 
+    /*!< + options >*/ //if no options this data will not sending becouse header length is not incude this data
     TCP_data[0]=2;//Maximum Segment Size (2)    
     TCP_data[1]=4;//Length
     TCP_data[2]=0x05;
     TCP_data[3]=0x82; 
 }
-void Eth::tcp_reply()
-{
+void Eth::tcp_reply() {
     uint16_t len = sizeof(FrameX) + swap16(IP_received.len);
     for (uint8_t i=0;i<sizeof(FrameX);i++)
     {TxBuf[i] = *((uint8_t*)(&frameRx)+i);}
@@ -459,8 +484,7 @@ void Eth::tcp_reply()
 }
 
 //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-void ETH_IRQHandler(void)
-{
+void ETH_IRQHandler(void) {
     /*!< receive descriptor automatically starts belonging to host >*/
     ETH->DMASR|=ETH_DMASR_RS; //clear bit of interrupt
     Eth::pThis->ReceiveFlag=true;

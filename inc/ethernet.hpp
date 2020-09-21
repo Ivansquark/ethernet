@@ -5,8 +5,7 @@
 
 extern "C" void ETH_IRQHandler(void);
 
-class Eth
-{
+class Eth {
 public:
     Eth(uint8_t* rxB,uint8_t* txB);		
 	//-----------------------------------------------
@@ -44,7 +43,7 @@ public:
 	void udp_write(uint8_t* data, uint16_t len, uint16_t port);
 //-------------------- TCP ----------------------------------
 	void tcp_read();
-	void tcp_initReply();
+	void tcp_initReply(uint8_t flags, uint16_t TCP_data_len);
 	void tcp_reply();
 //---------------------------------------------------------
     void receive_frame(); //depricated
