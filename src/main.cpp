@@ -25,27 +25,28 @@ int main()
     
     //uint8_t y=0;
     eth.arp_send();
-    for(uint32_t i=0;i<50000000;i++);
+    for(uint32_t i=0;i<90000000;i++);
     eth.frame_read();
     for(uint8_t i=0;i<6;i++)
     {uart.sendByte(eth.mac_receive[i]);/*eth.mac_receive[i]=0;*/}  
     eth.ReceiveFlag=false;
     eth.icmp_write();
-    uint32_t num=0;
+    uint32_t num=0xFFFFFFF0;
     while(1)
     {
         if(GpTimer::timFlag) {
             num++;
             if(eth.TCPconnected){
                 //eth.swap32()
-                uart.sendByte(*((uint8_t*)(num)+3));
-                //eth.TCP_data_transmit[0] = (uint8_t)(num>>24);
-                //eth.TCP_data_transmit[1] = (uint8_t)(num>>16);
-                //eth.TCP_data_transmit[2] = (uint8_t)(num>>8);
-                //eth.TCP_data_transmit[3] = (uint8_t)(num);
-                //eth.tcp_reply(4,false);
+                uart.sendByte(num);
+                eth.TCP_data_transmit[0] = (uint8_t)(num>>24);
+                eth.TCP_data_transmit[1] = (uint8_t)(num>>16);
+                eth.TCP_data_transmit[2] = (uint8_t)(num>>8);
+                eth.TCP_data_transmit[3] = (uint8_t)(num);
+                //eth.TCP_received.fl = 0;
+                eth.tcp_reply(4,false);
             }
-            GpTimer = false;
+            GpTimer::timFlag = false;
         }
 
         if(eth.ReceiveFlag) {
@@ -71,7 +72,7 @@ int main()
             }
             if(eth.TCP_data_receive[0] == 'o' &&
                eth.TCP_data_receive[1] == 'p' &&
-               eth.TCP_data_receive[2] == 'a' && TCP_received_data_len == 3) 
+               eth.TCP_data_receive[2] == 'a' && eth.TCP_received_data_len == 3) 
             {
                 eth.TCP_data_transmit[0] = 'j';
                 eth.TCP_data_transmit[1] = 'o';

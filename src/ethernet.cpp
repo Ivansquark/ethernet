@@ -393,6 +393,7 @@ void Eth::tcp_read() {
     }  
     else if (tcp_receivePtr->fl==(TCP_ACK)) { // if got acknowledgement packet
         //TODO: send usfull data with TCP_ACK 
+        tcp_initReply(TCP_ACK,0);
     }
     else if (tcp_receivePtr->fl==(TCP_RST)) { // if reset from remote host
         //nothing here
