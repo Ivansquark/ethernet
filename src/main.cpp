@@ -32,13 +32,13 @@ int main()
     eth.ReceiveFlag=false;
     eth.icmp_write();
     uint32_t num=0xFFFFFFF0;
+    bool startFlag=false;
     while(1)
     {
         if(GpTimer::timFlag) {
             num++;
-            if(eth.TCPconnected){
-                //eth.swap32()
-                uart.sendByte(num);
+            if(eth.TCPconnected && startFlag){
+                //uart.sendByte(num);
                 eth.TCP_data_transmit[0] = (uint8_t)(num>>24);
                 eth.TCP_data_transmit[1] = (uint8_t)(num>>16);
                 eth.TCP_data_transmit[2] = (uint8_t)(num>>8);
@@ -79,6 +79,7 @@ int main()
                 eth.TCP_data_transmit[2] = 'p';
                 eth.TCP_data_transmit[3] = 'a';
                 eth.TCP_data_transmit[4] = '\n';
+                startFlag = true;
                 //eth.tcp_initReply(TCP_ACK,4);        
                 eth.tcp_reply(5,false);
             }
