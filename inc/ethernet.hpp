@@ -47,6 +47,7 @@ public:
 	void tcp_read();
 	void tcp_initReply(uint8_t flags, uint16_t TCP_data_len);
 	void tcp_reply(uint16_t TCP_data_len,bool reply);
+	bool TCPconnected=false;
 //---------------------------------------------------------
     void receive_frame(); //depricated
 	void transmit_frame(uint16_t size); 

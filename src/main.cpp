@@ -18,7 +18,9 @@ int main()
     font.intToChar(x);
     font.print(10,50,0x00ff,font.arr,0);
     eth.receive_frame();
-	for(uint8_t i=0;i<60;i++)    
+	for(uint8_t i=0;i<60;i++)   
+    GpTimer tim(2);//500 ms
+
     __enable_irq();
     
     //uint8_t y=0;
@@ -29,19 +31,24 @@ int main()
     {uart.sendByte(eth.mac_receive[i]);/*eth.mac_receive[i]=0;*/}  
     eth.ReceiveFlag=false;
     eth.icmp_write();
+    uint32_t num=0;
     while(1)
     {
-        //eth.arp_send();
-        //for(uint32_t i=0;i<150000000;i++);
-        //eth.arp_read();
-        
-        //for(uint8_t i=0;i<6;i++)
-        //{uart.sendByte(eth.mac_recieve[i]);}
-        //eth.arp_read();                
-	           
-        //Eth::pThis->ReceiveDL[0] |= (1<<31); //sets OWN bit to DMA     
-        if(eth.ReceiveFlag)
-        {
+        if(GpTimer::timFlag) {
+            num++;
+            if(eth.TCPconnected){
+                //eth.swap32()
+                uart.sendByte(*((uint8_t*)(num)+3));
+                //eth.TCP_data_transmit[0] = (uint8_t)(num>>24);
+                //eth.TCP_data_transmit[1] = (uint8_t)(num>>16);
+                //eth.TCP_data_transmit[2] = (uint8_t)(num>>8);
+                //eth.TCP_data_transmit[3] = (uint8_t)(num);
+                //eth.tcp_reply(4,false);
+            }
+            GpTimer = false;
+        }
+
+        if(eth.ReceiveFlag) {
             eth.frame_read();
             if(eth.UDPflag)
             {                
@@ -64,7 +71,7 @@ int main()
             }
             if(eth.TCP_data_receive[0] == 'o' &&
                eth.TCP_data_receive[1] == 'p' &&
-               eth.TCP_data_receive[2] == 'a') 
+               eth.TCP_data_receive[2] == 'a' && TCP_received_data_len == 3) 
             {
                 eth.TCP_data_transmit[0] = 'j';
                 eth.TCP_data_transmit[1] = 'o';
@@ -76,9 +83,6 @@ int main()
             }
             eth.TCP_received_data_len=0;
         }
-
-            
-        
     }
     return 0;
 }

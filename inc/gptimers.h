@@ -7,6 +7,7 @@ class GpTimer
 {
 public:
     GpTimer(uint8_t timNum){timer_ini(timNum);}
+    static bool timFlag;
 private:
     void timer_ini(uint8_t tim)
     {
@@ -15,8 +16,8 @@ private:
             case 2:
             {
                 RCC->APB1ENR|=RCC_APB1ENR_TIM2EN;
-                TIM2->PSC = 84;// TIM clk = 84000000  (clk APB1*2) => 1 MHz
-                TIM2->ARR = 50000-1; //50 ms
+                TIM2->PSC = 840;// TIM clk = 84000000  (clk APB1*2) => 100 kHz
+                TIM2->ARR = 50000-1; //500 ms
                 TIM2->DIER|=TIM_DIER_UIE; //interrupt at overload 
                 TIM2->CR1|=TIM_CR1_CEN;
                 NVIC_EnableIRQ(TIM2_IRQn); //irq enable
@@ -46,5 +47,25 @@ private:
         }        
     }
 };
+bool GpTimer::timFlag = 0;
+
+extern "C" void TIM2_IRQHandler(void) //500 ms
+{
+	TIM2->SR &=~ TIM_SR_UIF; 
+	GpTimer::timFlag = true; 
+	NVIC_ClearPendingIRQ(TIM4_IRQn); 
+}
+extern "C" void TIM3_IRQHandler(void) 
+{
+	TIM3->SR &=~ TIM_SR_UIF; 
+	
+	NVIC_ClearPendingIRQ(TIM4_IRQn); 
+}
+extern "C" void TIM4_IRQHandler(void) 
+{
+	TIM4->SR &=~ TIM_SR_UIF; 
+	 
+	NVIC_ClearPendingIRQ(TIM4_IRQn); 
+}
 
 #endif //GPTIMERS_H_

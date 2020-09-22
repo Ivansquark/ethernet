@@ -382,8 +382,10 @@ void Eth::tcp_read() {
     if((tcp_receivePtr->fl)==(TCP_SYN)) { //if start connection 
         tcp_initReply((TCP_SYN | TCP_ACK),0);
         tcp_reply(0,true);
+        TCPconnected = true;
     }  
     else if (tcp_receivePtr->fl==(TCP_FIN|TCP_ACK)) { //if starts disconnection from remote host
+        TCPconnected = false;
         tcp_initReply(TCP_ACK,0);
         tcp_reply(0,true);
         tcp_initReply(TCP_FIN|TCP_ACK,0);
@@ -479,7 +481,7 @@ void Eth::tcp_initReply(uint8_t flags, uint16_t TCP_data_len) {
         tcp_receivePtr->size_wnd = swap16(swap16(tcp_receivePtr->size_wnd) - TCP_received_data_len);
     }      
 //------------------------------------------------------------------------------------------------
-/*!< + options >*/ //if no options this data will not sending becouse header length is not incude this data
+/*!< + options >*/ //if no options this data will not sending because header length is not incude this data
     if(tcp_receivePtr->fl==(TCP_SYN)) {
         /*! <increasing for 4 bytes to send options> only in connection!!! */
         TCP_received.len_hdr = ((sizeof(TCP) + 4)>>2)<<4; //new header length + 4 bytes
