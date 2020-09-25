@@ -6,14 +6,12 @@
 class Uart6
 {
 public:
-    Uart6()
-    {
-        uart6_ini();
+    Uart6()     {
+        pThis=this;uart6_ini();
     }
     void sendByte(uint8_t byte)
     {
         while(!(USART6->SR & USART_SR_TXE)){};
-
         USART6->DR=byte;
     }
     void sendStr(const char* str)
@@ -24,6 +22,9 @@ public:
             sendByte(str[i++]);
         }
     }
+    bool interruptFlag=false;
+    uint8_t byteRead=0;
+    static Uart6* pThis;
 private:
     void uart6_ini()
     {
@@ -41,7 +42,7 @@ private:
         USART6->CR1&=~USART_CR1_M; //0 - 8 Data bits
         USART6->CR1|=USART_CR1_TE; // Transmission enabled
         USART6->CR1|=USART_CR1_RE; // Recieving enabled
-        USART6->CR1|=USART_CR1_RXNEIE; //enable interrupt on Rx from usart1
+        USART6->CR1|=USART_CR1_RXNEIE; //enable interrupt on Rx from usart6
         //USART1->BRR=0x445C; //2400 (APB2CLK - baudrate/2)/baudrate 
         // APB2 clk =84000000 
         USART6->BRR=0x222D; //9600 //(84000000-4800)/9600
@@ -49,8 +50,15 @@ private:
 	    //USART1->BRR=0xEA5; //9600 //(36000000-4800)/9600        
         //USART1->BRR=0x16C; //115200
         USART6->CR1|=USART_CR1_UE; //USART EN
-        //NVIC_EnableIRQ(USART1_IRQn);
+        NVIC_EnableIRQ(USART6_IRQn);
     }
 };
+Uart6* Uart6::pThis=nullptr;
+
+extern "C" void USART6_IRQHandler(void) {
+    //USART6->SR&=~USART_SR_RXNE;
+    Uart6::pThis->byteRead=USART6->DR; 
+    Uart6::pThis->interruptFlag=true;
+}
 
 #endif //UART_HPP

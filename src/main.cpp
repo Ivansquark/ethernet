@@ -35,6 +35,11 @@ int main()
     bool startFlag=false;
     while(1)
     {
+        if(uart.interruptFlag){
+            uart.sendStr("echo");
+            uart.sendByte(uart.byteRead);
+            uart.interruptFlag=false;
+        }
         if(GpTimer::timFlag) {
             num++;
             if(eth.TCPconnected && startFlag){
