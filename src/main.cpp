@@ -25,7 +25,7 @@ int main()
     
     //uint8_t y=0;
     eth.arp_send();
-    for(uint32_t i=0;i<90000000;i++);
+    for(uint32_t i=0;i<9000000;i++);
     eth.frame_read();
     for(uint8_t i=0;i<6;i++)
     {uart.sendByte(eth.mac_receive[i]);/*eth.mac_receive[i]=0;*/}  

@@ -16,7 +16,8 @@ public:
 	uint8_t UDP_data[200];// for deferred reply
 	TCP TCP_received{0};
 	uint8_t TCP_data_transmit[1500-sizeof(IP)];
-	uint8_t TCP_data_receive[0x2000]; //8192 on stack (window buffer)
+	uint8_t TCP_window_receive[0x2000]; //8192 on stack (window buffer)
+	uint16_t bytesInWindow=0;
 	uint16_t TCP_received_data_len{0}; //size of received data in segment
 	//-----------------------------------------------
 	FrameX* fRx{nullptr};
@@ -83,7 +84,7 @@ private:
 	const uint8_t mac[6] = {0x32,0x12,0x56,0x78,0x9a,0xbc};
 	const uint8_t mac_broadcast[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
 	const uint8_t mac_gate[6] =  {0x20,0x1a,0x06,0x7f,0xd6,0xb6};
-	const uint16_t udp_port = 50000;
+	const uint16_t udp_port = 55555;
 };
 
 #endif //ETHERNET_HPP
